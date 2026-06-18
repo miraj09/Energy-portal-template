@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /*
+   * Design tokens
+   * NOTE: This codebase uses Tailwind v4 `@theme` variables (no tailwind.config).
+   * Keep “brand” values in CSS variables so they can adapt for dark mode.
+   */
+  --primary: #346fb6; /* Brand blue */
+  --primary-foreground: #ffffff;
+  --primary-soft: #e7f1fd;
+
+  --secondary: #f3f4f6;
+  --secondary-foreground: #111827;
+
+  --accent: #f3f4f6;
+  --accent-foreground: #111827;
+
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #e5e7eb;
+  --input: #d1d5db;
+  --ring: #346fb6;
+
+  /* Shadcn surface tokens — app surfaces stay light even when OS prefers dark */
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+
+    /*
+     * Dark-mode token overrides
+     * Keep brand recognizable but bump brightness for contrast on dark surfaces.
+     */
+    --primary: #60a5fa;
+    /* Light text on brand blue matches light mode and passes contrast for small UI text. */
+    --primary-foreground: #ffffff;
+    --primary-soft: rgba(96, 165, 250, 0.18);
+
+    --secondary: #111827;
+    --secondary-foreground: #f9fafb;
+
+    --accent: #111827;
+    --accent-foreground: #f9fafb;
+
+    --muted: #111827;
+    --muted-foreground: #9ca3af;
+
+    --border: #1f2937;
+    --input: #374151;
+    --ring: #60a5fa;
+
+    /* Keep popovers/cards readable on hard-coded white panels */
+    --card: #ffffff;
+    --card-foreground: #171717;
+    --popover: #ffffff;
+    --popover-foreground: #171717;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Account management (users/roles): panels stay light when OS prefers dark mode.
+ * --card / --card-foreground stay readable in globals.css dark block.
+ */
+.account-light-surface {
+  color-scheme: light;
+  color: #48505e;
+}
+
+.account-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  color-scheme: light;
+}
+
+.account-modal {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  color-scheme: light;
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+  border: 2px solid #f1f1f1;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure the ScrollArea shows the scrollbar */
+.custom-scrollbar [data-radix-scroll-area-viewport] {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+.custom-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 12px;
+}
+
+.custom-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+.custom-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+  border: 2px solid #f1f1f1;
+}
+
+.custom-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Global table styles to fix focus and cursor issues */
+table tr {
+  cursor: default !important;
+}
+
+table tr:focus {
+  outline: none !important;
+}
+
+table td {
+  cursor: default !important;
+}
+
+table th {
+  cursor: default !important;
+}
+
+/* Ensure buttons within tables still have pointer cursor */
+table button {
+  cursor: pointer !important;
+}
+
+/* Ensure interactive elements within tables have proper cursor */
+table a {
+  cursor: pointer !important;
+}
+
+table input {
+  cursor: text !important;
+}
+
+table select {
+  cursor: pointer !important;
+}
+
+/* Tooltip styles to ensure proper visibility */
+[data-radix-tooltip-content] {
+  background-color: white !important;
+  color: #1f2937 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  opacity: 1 !important;
+  z-index: 9999 !important;
+}

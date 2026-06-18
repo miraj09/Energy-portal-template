@@ -1,0 +1,1 @@
+export { NotesAttachmentsModal } from "./NotesAttachmentsModal"; 
