@@ -30,14 +30,31 @@ This component handles the submission of sold tariff forms to the company API en
 - `owner_partner_name` ← `form.ownerPartnerName` (optional)
 - `owner_partner_dob` ← `form.ownerPartnerDOB` (optional)
 - `primary_telephone_number` ← `form.telephoneNumber` (optional)
-- `primary_contact_first_name` ← `form.primaryContactFirstName` (optional)
-- `primary_contact_last_name` ← `form.primaryContactLastName` (optional)
-- `primary_contact_position` ← `form.primaryContactPosition` (optional)
-- `primary_contact_email` ← `form.primaryContactEmail` (optional)
-- `primary_contact_title` ← `form.primaryContactTitle` (optional)
+- `primary_contact` ← nested object:
+  - `first_name` ← `form.primaryContactFirstName`
+  - `last_name` ← `form.primaryContactLastName`
+  - `position` ← `form.primaryContactPosition`
+  - `email` ← `form.primaryContactEmail`
+  - `title` ← `form.primaryContactTitle`
+  - `telephone` ← `form.telephoneNumber`
 
 ### Bank Details
-- `account_number` ← `form.accountNumber` (optional)
+- `bank` ← nested object (do **not** send flat `bank_name` at root):
+  - `bank_name` ← `form.bankName`
+  - `account_name` ← `form.accountName`
+  - `account_number` ← `form.accountNumber`
+  - `sort_code` ← `form.sortCode`
+
+### Site + Meter
+- `sites[]` ← array with one site when MPAN/MPRN is known:
+  - `sitename`, `postcode`, `address_line_1..4`, `total_employee`
+  - `meterstrings: [mpanString]` — creates meter + quote-header per string
+
+### Meter + Quote (application flow)
+1. `POST /api/v1/auth/web/core/meter/` with `{ site, meter_type, meter_reference }`
+2. `PATCH /api/v1/auth/web/core/quote-header/{quoteId}/` with flat rate fields (`standing_charge`, `day_rate`, `day_kwh`, etc.)
+
+See `docs/new-api-integration-guideline.md` for the full API contract.
 - `sort_code` ← `form.sortCode` (optional)
 - `bank_name` ← `form.bankName` (optional)
 - `account_name` ← `form.accountName` (optional)

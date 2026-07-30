@@ -4,6 +4,8 @@ import { storeTokens, clearTokens, hasValidToken, getRefreshToken } from "./toke
 import { apiGet } from "./api-client";
 import { mapLoginUserData, type TokenUserPayload } from "@/lib/user/mapLoginUserData";
 import type { UserRecord } from "@/lib/types/user";
+import { getDefaultRouteForPermissions } from "@/lib/navigation/defaultRoute";
+import { loadUserPermissions } from "@/lib/permissions/permissionUtils";
 
 export interface LoginCredentials {
   email: string;
@@ -15,6 +17,7 @@ export interface LoginResponse {
   message?: string;
   errors?: Record<string, string[]>;
   userData?: UserRecord;
+  defaultRoute?: string;
 }
 
 /**
@@ -70,10 +73,13 @@ export async function loginAction(
     });
 
     const userData = mapLoginUserData(data.data as TokenUserPayload);
+    const permissions = await loadUserPermissions();
+    const defaultRoute = getDefaultRouteForPermissions(permissions);
 
     return {
       success: true,
       userData,
+      defaultRoute,
     };
 
   } catch (error) {
@@ -162,6 +168,24 @@ export async function getGroupedInvoiceByCompanyId(companyId: string) {
   console.log("📄 Fetching grouped invoice details from:", endpoint);
   const result = await apiGet(endpoint);
   console.log("📄 Grouped invoice details API response:", result);
+  return result;
+}
+
+/**
+ * Get invoice details by invoice ID
+ */
+export async function getInvoiceById(invoiceId: string) {
+  if (!invoiceId) {
+    return {
+      success: false,
+      message: "Invoice ID is required",
+    };
+  }
+
+  const endpoint = `/api/v1/auth/web/core/invoice/${invoiceId}/`;
+  console.log("📄 Fetching invoice details from:", endpoint);
+  const result = await apiGet(endpoint);
+  console.log("📄 Invoice details API response:", result);
   return result;
 }
 

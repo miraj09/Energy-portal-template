@@ -38,12 +38,16 @@ const EditMeterModal: React.FC<EditMeterModalProps> = ({
   const isGas = meter?.type.toLowerCase() === "gas";
   const [initialQuoteData, setInitialQuoteData] =
     useState<MeterQuoteFormValues | null>(null);
+  const [initialQuoteId, setInitialQuoteId] = useState<number | undefined>(
+    undefined
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !meter?.id) {
       setInitialQuoteData(null);
+      setInitialQuoteId(undefined);
       setLoadError(null);
       setIsLoading(false);
       return;
@@ -56,6 +60,7 @@ const EditMeterModal: React.FC<EditMeterModalProps> = ({
       setIsLoading(true);
       setLoadError(null);
       setInitialQuoteData(null);
+      setInitialQuoteId(undefined);
 
       const response = await getApplicationMeter(meterId);
 
@@ -66,6 +71,7 @@ const EditMeterModal: React.FC<EditMeterModalProps> = ({
           ...response.formValues,
           postcode: response.formValues.postcode || sitePostcode,
         });
+        setInitialQuoteId(response.quoteId);
         setIsLoading(false);
         return;
       }
@@ -130,6 +136,7 @@ const EditMeterModal: React.FC<EditMeterModalProps> = ({
               companyId={companyId}
               siteId={siteId}
               meterId={meter.id}
+              quoteId={initialQuoteId}
               initialQuoteData={initialQuoteData}
               onSuccess={handleMeterUpdated}
             />
@@ -140,6 +147,7 @@ const EditMeterModal: React.FC<EditMeterModalProps> = ({
               companyId={companyId}
               siteId={siteId}
               meterId={meter.id}
+              quoteId={initialQuoteId}
               initialQuoteData={initialQuoteData}
               onSuccess={handleMeterUpdated}
             />

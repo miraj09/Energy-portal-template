@@ -2,6 +2,7 @@ import AllRolesTable from "@/components/account/AllRolesTable";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { FilterAwarePagination } from "@/components/ui/FilterAwarePagination";
 import { getResource } from "@/lib/baseQueries";
+import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 import { isSessionExpired } from "@/lib/constants/authErrors";
 import type { RoleRecord } from "@/lib/types/role";
 
@@ -34,7 +35,7 @@ export default async function RoleListPage({
     }
 
     const [rolesRes, permissionsRes] = await Promise.all([
-      getResource(apiUrl, {}, { section: "authentication", action: "view_role_list" }),
+      getResource(apiUrl, {}, { section: SIDEBAR_NAVIGATION_SECTION, action: "view_role_list" }),
       getResource("api/v1/auth/web/all-permissions-section-wise/"),
     ]);
 

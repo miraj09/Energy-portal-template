@@ -17,6 +17,7 @@ type ExportContractContactDetails = {
   submitted_by?: string | null;
   aq_eac?: string | number | null;
   mpan_mrpn_text?: string | null;
+  bottom_line?: string | null;
   cl?: string | number | null;
   /** API may return a slug string, numeric id, or nested object depending on serializer. */
   lead_status?: string | number | { id?: number; name?: string } | null;
@@ -193,10 +194,37 @@ function orphanLeadStatusOptionLabel(details: ExportContractContactDetails): str
   return "Unknown lead status";
 }
 
+/** True when the selected lead status row is Live (by API list id or contact fallback). */
+function isLiveLeadStatus(
+  leadStatusIdSelectValue: string,
+  apiItems: LeadStatusListItem[],
+  details?: ExportContractContactDetails | null,
+): boolean {
+  const id = leadStatusIdSelectValue.trim();
+  if (!id) return false;
+
+  const fromList = apiItems.find((item) => String(item.id) === id);
+  if (fromList) {
+    return normalizeExportContractLeadStatusKey(fromList.name) === "live";
+  }
+
+  if (details && resolveContactLeadStatusSelectValue(details, apiItems) === id) {
+    const raw = details.lead_status;
+    if (typeof raw === "object" && raw !== null && raw.name != null) {
+      return normalizeExportContractLeadStatusKey(String(raw.name)) === "live";
+    }
+    if (typeof raw === "string") {
+      return normalizeExportContractLeadStatusKey(raw) === "live";
+    }
+  }
+
+  return false;
+}
+
 type UpdateLeadStatusAndContractTimelinePayload = {
   company_id: string;
   lead_status_id: number;
-  live_date: string;
+  live_date?: string;
   reminder_date: string;
   window_open: string;
   end_date: string;
@@ -207,6 +235,22 @@ type DerivedScheduleDates = {
   reminderDate: Date;
   windowOpenDate: Date;
 };
+
+/** Compute contract end / reminder / window open from a live date picker value. */
+function computeDerivedScheduleDatesFromLiveDate(
+  liveDateValue: string,
+): DerivedScheduleDates | null {
+  if (!liveDateValue.trim()) return null;
+  const liveDate = parse(liveDateValue, "yyyy-MM-dd", new Date());
+  if (Number.isNaN(liveDate.getTime())) return null;
+
+  const contractEndingDate = addYears(liveDate, 1);
+  return {
+    contractEndingDate,
+    reminderDate: subDays(contractEndingDate, 180),
+    windowOpenDate: subDays(contractEndingDate, 120),
+  };
+}
 
 /**
  * Normalizes API datetime or date-only strings to `yyyy-MM-dd` for timeline payloads.
@@ -229,13 +273,14 @@ const toYyyyMmDd = (value: string | null | undefined): string => {
 
 /**
  * Builds the PATCH body for `update-lead-status-and-contract-timeline`.
- * When the user has set Live date, derived reminder / window / end dates are used; otherwise stored contact dates are sent.
+ * `live_date` is included only when the selected lead status is Live.
  */
 function buildUpdateLeadStatusAndContractTimelinePayload(
   details: ExportContractContactDetails,
   leadStatusIdSelectValue: string,
   publishDate: string,
   derivedScheduleDates: DerivedScheduleDates | null,
+  leadStatusListItems: LeadStatusListItem[],
 ): UpdateLeadStatusAndContractTimelinePayload | null {
   const companyIdRaw = details.company?.id;
   if (
@@ -251,34 +296,44 @@ function buildUpdateLeadStatusAndContractTimelinePayload(
     return null;
   }
 
+  const isLiveStatus = isLiveLeadStatus(
+    leadStatusIdSelectValue,
+    leadStatusListItems,
+    details,
+  );
+
   const trimmedLivePicker = publishDate.trim();
-  let live_date = "";
   let reminder_date = "";
   let window_open = "";
   let end_date = "";
 
-  if (trimmedLivePicker && derivedScheduleDates) {
-    live_date = trimmedLivePicker;
-    end_date = formatDateLikeLiveDateInput(derivedScheduleDates.contractEndingDate);
+  if (isLiveStatus && trimmedLivePicker && derivedScheduleDates) {
     reminder_date = formatDateLikeLiveDateInput(derivedScheduleDates.reminderDate);
     window_open = formatDateLikeLiveDateInput(derivedScheduleDates.windowOpenDate);
+    end_date = formatDateLikeLiveDateInput(derivedScheduleDates.contractEndingDate);
   } else {
-    live_date =
-      trimmedLivePicker ||
-      toYyyyMmDd(details.live_date);
     reminder_date = toYyyyMmDd(details.reminder_date);
     window_open = toYyyyMmDd(details.window_open);
     end_date = toYyyyMmDd(details.con_end_date);
   }
 
-  return {
+  const payload: UpdateLeadStatusAndContractTimelinePayload = {
     company_id: String(companyIdRaw),
     lead_status_id: leadStatusId,
-    live_date,
     reminder_date,
     window_open,
     end_date,
   };
+
+  if (isLiveStatus) {
+    const live_date =
+      trimmedLivePicker || toYyyyMmDd(details.live_date);
+    if (live_date) {
+      payload.live_date = live_date;
+    }
+  }
+
+  return payload;
 }
 
 const ExportContractDetails = ({ id }: { id: string }) => {
@@ -289,6 +344,10 @@ const ExportContractDetails = ({ id }: { id: string }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [publishDate, setPublishDate] = useState<string>("");
+  /** Live status chosen in the dropdown before a live date is picked and saved. */
+  const [pendingLeadStatusId, setPendingLeadStatusId] = useState<string | null>(
+    null,
+  );
   const [isUpdatingLeadStatus, setIsUpdatingLeadStatus] = useState(false);
   const [isSavingTimeline, setIsSavingTimeline] = useState(false);
 
@@ -298,8 +357,28 @@ const ExportContractDetails = ({ id }: { id: string }) => {
   const [isLoadingLeadStatuses, setIsLoadingLeadStatuses] = useState(true);
 
   useEffect(() => {
+    setPendingLeadStatusId(null);
     setPublishDate("");
   }, [id]);
+
+  useEffect(() => {
+    if (!details || pendingLeadStatusId) return;
+
+    const statusValue = resolveContactLeadStatusSelectValue(
+      details,
+      leadStatusListItems,
+    );
+
+    if (isLiveLeadStatus(statusValue, leadStatusListItems, details)) {
+      const normalizedLive = toYyyyMmDd(details.live_date);
+      if (normalizedLive) {
+        setPublishDate(normalizedLive);
+      }
+      return;
+    }
+
+    setPublishDate("");
+  }, [details, leadStatusListItems, pendingLeadStatusId]);
 
   const fetchLeadStatuses = useCallback(async () => {
     try {
@@ -361,12 +440,6 @@ const ExportContractDetails = ({ id }: { id: string }) => {
 
       const payload = response.data as ExportContractContactDetails | undefined;
       setDetails(payload ?? null);
-      if (payload?.live_date) {
-        const normalizedLive = toYyyyMmDd(payload.live_date);
-        if (normalizedLive) {
-          setPublishDate(normalizedLive);
-        }
-      }
     } catch (error) {
       console.error("Error fetching export contract details:", error);
       toast.error("An error occurred while fetching export contract details");
@@ -386,6 +459,15 @@ const ExportContractDetails = ({ id }: { id: string }) => {
     [details, leadStatusListItems],
   );
 
+  /** Shown in the dropdown: pending Live selection or saved server value. */
+  const activeLeadStatusId = pendingLeadStatusId ?? currentLeadStatusValue;
+
+  const isLiveFlowActive = useMemo(
+    () =>
+      isLiveLeadStatus(activeLeadStatusId, leadStatusListItems, details),
+    [activeLeadStatusId, leadStatusListItems, details],
+  );
+
   /**
    * Options from GET lead-status; if the contact's id is not in the list (deprecated row),
    * prepend a synthetic option so the select still shows the server value.
@@ -396,60 +478,61 @@ const ExportContractDetails = ({ id }: { id: string }) => {
       label: row.name,
     }));
 
-    if (!details || !currentLeadStatusValue) return base;
-    if (base.some((option) => option.value === currentLeadStatusValue)) {
+    if (!details || !activeLeadStatusId) return base;
+    if (base.some((option) => option.value === activeLeadStatusId)) {
       return base;
     }
 
     return [
       {
-        value: currentLeadStatusValue,
+        value: activeLeadStatusId,
         label: orphanLeadStatusOptionLabel(details),
       },
       ...base,
     ];
-  }, [currentLeadStatusValue, details, leadStatusListItems]);
+  }, [activeLeadStatusId, details, leadStatusListItems]);
 
   const selectedLeadStatusOption = useMemo(() => {
-    if (!currentLeadStatusValue) return undefined;
+    if (!activeLeadStatusId) return undefined;
     return leadStatusSelectOptions.find(
-      (option) => option.value === currentLeadStatusValue,
+      (option) => option.value === activeLeadStatusId,
     );
-  }, [currentLeadStatusValue, leadStatusSelectOptions]);
+  }, [activeLeadStatusId, leadStatusSelectOptions]);
 
   /**
    * When Live date is set: contract end is placeholder (+1 year from live); reminder and window open
    * are N days before contract end (renewal-style schedule). Used for preview and timeline PATCH payload.
    */
   const derivedScheduleDates = useMemo((): DerivedScheduleDates | null => {
-    if (!publishDate.trim()) return null;
-    const liveDate = parse(publishDate, "yyyy-MM-dd", new Date());
-    if (Number.isNaN(liveDate.getTime())) return null;
+    if (!isLiveFlowActive) return null;
+    return computeDerivedScheduleDatesFromLiveDate(publishDate);
+  }, [isLiveFlowActive, publishDate]);
 
-    const contractEndingDate = addYears(liveDate, 1);
-    const reminderDate = subDays(contractEndingDate, 180);
-    const windowOpenDate = subDays(contractEndingDate, 120);
-
-    return {
-      contractEndingDate,
-      reminderDate,
-      windowOpenDate,
-    };
-  }, [publishDate]);
+  type LeadStatusPatchOverrides = {
+    publishDate?: string;
+    derivedScheduleDates?: DerivedScheduleDates | null;
+  };
 
   const patchLeadStatusAndContractTimeline = useCallback(
     async (
       leadStatusIdSelectValue: string,
+      overrides?: LeadStatusPatchOverrides,
     ): Promise<{ ok: true } | { ok: false; message?: string }> => {
       if (!details) {
         return { ok: false, message: "Contact details are not loaded yet." };
       }
 
+      const liveDateForPayload = overrides?.publishDate ?? publishDate;
+      const derivedForPayload =
+        overrides?.derivedScheduleDates ??
+        computeDerivedScheduleDatesFromLiveDate(liveDateForPayload);
+
       const payload = buildUpdateLeadStatusAndContractTimelinePayload(
         details,
         leadStatusIdSelectValue,
-        publishDate,
-        derivedScheduleDates,
+        liveDateForPayload,
+        derivedForPayload,
+        leadStatusListItems,
       );
 
       if (!payload) {
@@ -482,20 +565,35 @@ const ExportContractDetails = ({ id }: { id: string }) => {
         message: response.message || "Request failed",
       };
     },
-    [details, derivedScheduleDates, publishDate],
+    [details, publishDate, leadStatusListItems],
   );
 
   const handleLeadStatusChange = useCallback(
     async (option: SelectOption | null) => {
       if (!option?.value || !id || !details) return;
-      if (option.value === currentLeadStatusValue) return;
+      if (option.value === activeLeadStatusId) return;
+
+      const selectingLive = isLiveLeadStatus(
+        option.value,
+        leadStatusListItems,
+        details,
+      );
+
+      if (selectingLive) {
+        setPendingLeadStatusId(option.value);
+        setPublishDate("");
+        return;
+      }
+
+      setPendingLeadStatusId(null);
+      setPublishDate("");
 
       try {
         setIsUpdatingLeadStatus(true);
         const result = await patchLeadStatusAndContractTimeline(option.value);
 
         if (result.ok) {
-          toast.success("Lead status and contract timeline updated.");
+          toast.success("Lead status updated.");
           await fetchDetails();
           return;
         }
@@ -516,10 +614,11 @@ const ExportContractDetails = ({ id }: { id: string }) => {
       }
     },
     [
-      currentLeadStatusValue,
+      activeLeadStatusId,
       details,
       fetchDetails,
       id,
+      leadStatusListItems,
       patchLeadStatusAndContractTimeline,
       router,
     ],
@@ -530,19 +629,34 @@ const ExportContractDetails = ({ id }: { id: string }) => {
       toast.error("Missing contact or company for this update.");
       return;
     }
-    if (!currentLeadStatusValue) {
+
+    const leadStatusId = pendingLeadStatusId ?? currentLeadStatusValue;
+    if (!leadStatusId) {
       toast.error("Select a lead status before saving the timeline.");
+      return;
+    }
+
+    if (!publishDate.trim()) {
+      toast.error("Select a live date before saving.");
+      return;
+    }
+
+    const derived = computeDerivedScheduleDatesFromLiveDate(publishDate);
+    if (!derived) {
+      toast.error("Invalid live date.");
       return;
     }
 
     try {
       setIsSavingTimeline(true);
-      const result = await patchLeadStatusAndContractTimeline(
-        currentLeadStatusValue,
-      );
+      const result = await patchLeadStatusAndContractTimeline(leadStatusId, {
+        publishDate,
+        derivedScheduleDates: derived,
+      });
 
       if (result.ok) {
-        toast.success("Contract timeline saved.");
+        toast.success("Lead status and contract timeline updated.");
+        setPendingLeadStatusId(null);
         await fetchDetails();
         return;
       }
@@ -567,6 +681,8 @@ const ExportContractDetails = ({ id }: { id: string }) => {
     details?.id,
     fetchDetails,
     patchLeadStatusAndContractTimeline,
+    pendingLeadStatusId,
+    publishDate,
     router,
   ]);
 
@@ -650,10 +766,11 @@ const ExportContractDetails = ({ id }: { id: string }) => {
                 className="min-w-[200px] w-full max-w-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Options from GET lead-status; PATCH update-lead-status-and-contract-timeline
-                includes timeline dates from this contact or the live date picker.
+                Non-live statuses save immediately. Live requires a live date
+                before saving.
               </p>
             </div>
+            {isLiveFlowActive && (
             <div className="space-y-3">
               <Label htmlFor="publish-date">Live Date</Label>
               <Input
@@ -668,39 +785,44 @@ const ExportContractDetails = ({ id }: { id: string }) => {
                 Selected:{" "}
                 <span className={detailValueClassName}>{publishDateLabel}</span>
               </p>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="w-full max-w-sm"
-                disabled={
-                  isSavingTimeline ||
-                  isUpdatingLeadStatus ||
-                  !details?.company?.id ||
-                  !currentLeadStatusValue ||
-                  leadStatusSelectOptions.length === 0
-                }
-                onClick={() => {
-                  void handleSaveContractTimeline();
-                }}
-              >
-                {isSavingTimeline ? "Saving…" : "Save contract timeline"}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                With a live date, derived end / reminder / window values are sent;
-                otherwise stored dates on the contact are used.
-              </p>
+              {publishDate && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full max-w-sm"
+                  disabled={
+                    isSavingTimeline ||
+                    isUpdatingLeadStatus ||
+                    !details?.company?.id ||
+                    !activeLeadStatusId ||
+                    leadStatusSelectOptions.length === 0
+                  }
+                  onClick={() => {
+                    void handleSaveContractTimeline();
+                  }}
+                >
+                  {isSavingTimeline ? "Saving…" : "Save contract timeline"}
+                </Button>
+              )}
+              {pendingLeadStatusId && !publishDate && (
+                <p className="text-xs text-muted-foreground">
+                  Select a live date, then save to apply the Live status and
+                  contract timeline.
+                </p>
+              )}
             </div>
+            )}
           </div>
-          {derivedScheduleDates && (
+          {isLiveFlowActive && derivedScheduleDates && (
             <div className="space-y-3 md:col-span-2 pt-1">
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-400">
-                Schedule preview (from live date)
+                Contract timeline (from live date)
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-3">
                   <Label htmlFor="schedule-contract-ending">
-                    Contract ending date
+                    Contract end date
                   </Label>
                   <Input
                     id="schedule-contract-ending"
@@ -768,7 +890,7 @@ const ExportContractDetails = ({ id }: { id: string }) => {
           <div>
             <p className={detailLabelClassName}>MPAN/MPRN</p>
             <p className={detailValueClassName}>
-              {toDisplayString(details?.mpan_mrpn_text)}
+              {toDisplayString(details?.bottom_line)}
             </p>
           </div>
           <div>

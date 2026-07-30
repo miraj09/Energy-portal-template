@@ -7,6 +7,9 @@ import { Input } from "@/ui/input";
 import CustomDateInput from "@/ui/customDateInput";
 import { Dialog, DialogContent } from "@/ui/modal";
 import { Switch } from "@/ui/switch";
+import { patchMethod } from "@/lib/actions/patchMethod";
+import { toast } from "sonner";
+import { buildFlatQuotePayload } from "@/composable/meterQuoteForm";
 import { SupplierOption } from "@/hooks/useSuppliers";
 import { useSupplierContext } from "@/contexts/SupplierContext";
 
@@ -128,31 +131,24 @@ interface GasQuoteDetailsModalProps {
   onCustomerViewChange?: (value: boolean) => void;
   quoteHeaderData?: {
     id: number;
-    profileclass: string;
-    MTC: string;
-    LLF: string;
-    Region: string;
     bottomline: string;
     postcode: string | null;
     Supplier: number;
     Number_of_Days: number;
-    PartnerUserID: string | null;
-    isCOT: boolean;
-    isRIsk: boolean;
-    useUplift: boolean;
-    MeterType: number;
-    Term: string | null;
     Contract_Start_Date: string;
-    Contract_Rates: Array<{
+    standing_charge?: string | number | null;
+    day_rate?: string | number | null;
+    day_kwh?: string | number | null;
+    /** Legacy — fallback read only */
+    Contract_Rates?: Array<{
       rate: number;
       usage: number | null;
       rate_type: number;
-      rate_required?: boolean;
-      usage_required?: boolean;
     }>;
     created_at: string;
     updated_at: string;
   } | null;
+  onSaveSuccess?: () => void;
 }
 
 export const GasQuoteDetailsModal = ({
@@ -162,7 +158,9 @@ export const GasQuoteDetailsModal = ({
   isCustomerView = true,
   onCustomerViewChange,
   quoteHeaderData,
+  onSaveSuccess,
 }: GasQuoteDetailsModalProps): JSX.Element => {
+  const [isSaving, setIsSaving] = useState(false);
   // Suppliers from context
   const { supplierOptions, loading: suppliersLoading } = useSupplierContext();
 
@@ -197,12 +195,28 @@ export const GasQuoteDetailsModal = ({
     }
   }, []);
 
-  // Helper: extract gas rates from Contract_Rates (1: standing, 2: unit)
+  // Read flat gas rates first; fall back to legacy Contract_Rates
   const extractGasRates = useCallback((qh: GasQuoteDetailsModalProps["quoteHeaderData"]) => {
     const empty = { currentStandingCharge: "", unitRate: "", unitKwh: "" };
-    if (!qh?.Contract_Rates) return empty;
+    if (!qh) return empty;
+
+    const hasFlatRates =
+      qh.standing_charge != null || qh.day_rate != null || qh.day_kwh != null;
+
+    if (hasFlatRates) {
+      const format = (value: string | number | null | undefined) =>
+        value == null ? "" : String(value);
+
+      return {
+        currentStandingCharge: format(qh.standing_charge),
+        unitRate: format(qh.day_rate),
+        unitKwh: format(qh.day_kwh),
+      };
+    }
+
+    if (!qh.Contract_Rates) return empty;
     const rates = { ...empty };
-    qh.Contract_Rates.forEach((rate: { rate: number; usage: number | null; rate_type: number }) => {
+    qh.Contract_Rates.forEach((rate) => {
       switch (rate.rate_type) {
         case 1:
           rates.currentStandingCharge = rate.rate?.toString?.() || "";
@@ -215,6 +229,48 @@ export const GasQuoteDetailsModal = ({
     });
     return rates;
   }, []);
+
+  const handleSave = async () => {
+    if (!quoteHeaderData?.id) {
+      toast.error("No quote ID available for saving");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = buildFlatQuotePayload({
+        isGas: true,
+        bottomline: formData.mprn,
+        postcode: formData.postcode || quoteHeaderData.postcode,
+        supplierId:
+          parseInt(formData.currentSupplier, 10) || quoteHeaderData.Supplier,
+        numberOfDays: formData.numberOfDays,
+        contractStartDate:
+          formData.contractStartDate || quoteHeaderData.Contract_Start_Date,
+        currentStandingCharge: formData.currentStandingCharge,
+        dayRate: formData.unitRate,
+        dayKwh: formData.unitKwh,
+      });
+
+      const response = await patchMethod(
+        payload,
+        `/api/v1/auth/web/core/quote-header/${quoteHeaderData.id}/`
+      );
+
+      if (response.success) {
+        toast.success("Gas quote updated successfully");
+        onSaveSuccess?.();
+        onClose();
+      } else {
+        toast.error(response.message || "Failed to update gas quote");
+      }
+    } catch (error) {
+      console.error("Error saving gas quote:", error);
+      toast.error("An error occurred while saving the gas quote");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Prefill from quoteHeaderData when available
   useEffect(() => {
@@ -423,13 +479,10 @@ export const GasQuoteDetailsModal = ({
             </Button>
             <Button 
               className="bg-[#2db9eb] hover:bg-[#2db9eb]/90 text-white"
-              onClick={() => {
-                // Handle save logic here
-                console.log('Saving gas quote details:', formData);
-                onClose();
-              }}
+              disabled={isSaving}
+              onClick={() => void handleSave()}
             >
-              Save Changes
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>

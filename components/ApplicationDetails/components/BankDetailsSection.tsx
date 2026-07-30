@@ -4,15 +4,18 @@ import { BankDetails } from "../types";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/ui/card";
 import { patchMethod } from "@/lib/actions/patchMethod";
+import { getApiErrorMessage } from "@/composable/getApiErrorMessage";
 
 interface BankDetailsSectionProps {
   bankDetails: BankDetails;
   onBankUpdate?: (updatedBank: BankDetails) => void;
+  companyId: string;
 }
 
 const BankDetailsSection: React.FC<BankDetailsSectionProps> = ({
   bankDetails,
   onBankUpdate,
+  companyId,
 }) => {
   const [bank, setBank] = useState<BankDetails>(bankDetails);
   const [isEditing, setIsEditing] = useState(false);
@@ -106,26 +109,18 @@ const BankDetailsSection: React.FC<BankDetailsSectionProps> = ({
         return;
       }
 
-      // Prepare the data to send to the API
       const bankData = {
-        banks: [
-          {
-            id: bank.id,
-            bank_name: bank.bank_name,
-            account_name: bank.account_name,
-            account_number: bank.account_number,
-            sort_code: bank.sort_code,
-            // company: bank.company,
-          },
-        ],
+        bank: {
+          bank_name: bank.bank_name,
+          account_name: bank.account_name,
+          account_number: bank.account_number,
+          sort_code: bank.sort_code,
+        },
       };
 
-      
-
-      // Call the PATCH API
       const response = await patchMethod(
         bankData,
-        `/api/v1/auth/web/core/company/${bank.company}/`
+        `/api/v1/auth/web/core/company/${companyId}/`
       );
 
       if (response.success) {
@@ -147,12 +142,15 @@ const BankDetailsSection: React.FC<BankDetailsSectionProps> = ({
         ) {
           toast.error("Authentication failed. Please log in again.");
         } else {
-          throw new Error(response.message || "Failed to save bank details");
+          toast.error(getApiErrorMessage(response));
+          return;
         }
       }
     } catch (error) {
       console.error("Error saving bank details:", error);
-      toast.error("Failed to save bank details. Please try again.");
+      const message =
+        error instanceof Error ? error.message : "Failed to save bank details";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }

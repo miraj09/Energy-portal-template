@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createResource } from "@/lib/actions/baseMutations";
+import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 
 const roleSchema = z.object({
   role: z.object({
@@ -27,7 +28,7 @@ export async function createRole(data: unknown) {
     const response = await createResource(
       "api/v1/auth/web/role/",
       parsed.data,
-      { section: "authentication", action: "add_role" }
+      { section: SIDEBAR_NAVIGATION_SECTION, action: "add_role" }
     );
     revalidatePath("/users/role-list");
     revalidatePath("/users/add-new-role");

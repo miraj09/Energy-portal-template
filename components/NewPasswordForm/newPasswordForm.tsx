@@ -215,9 +215,10 @@ export default function NewPasswordForm(): JSX.Element {
           <Image
             width={187}
             height={70}
-            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-cover"
+            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-contain"
             alt={branding.logoAlt}
             src={branding.logoSrc}
+            unoptimized
           />
         </div>
       </div>

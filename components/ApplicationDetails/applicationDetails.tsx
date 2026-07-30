@@ -33,6 +33,15 @@ import {
 } from "./types";
 import { formatDateTime } from "@/composable/getFormatedDate";
 import { getDropdown } from "@/lib/actions/getDropdown";
+import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
+import { getApplicationMeter } from "@/composable/getApplicationMeter";
+import {
+  coerceMeterBoolean,
+  buildMeterReferenceForDisplay,
+  mapMeterApiToContractDetails,
+  mapMeterListItemToContractDetails,
+  resolveMeterTypeLabel,
+} from "@/composable/meterQuoteForm";
 import { toast } from "sonner";
 
 const ApplicationDetails = ({ id }: { id: string }) => {
@@ -55,6 +64,7 @@ const ApplicationDetails = ({ id }: { id: string }) => {
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
   const [isEditMeterModalOpen, setIsEditMeterModalOpen] = useState(false);
   const [meterToEdit, setMeterToEdit] = useState<MeterDetail | null>(null);
+  const [viewingMeterId, setViewingMeterId] = useState<number | null>(null);
 
   const loadApplicationDetails = useCallback(
     async (showPageLoader = true) => {
@@ -88,16 +98,22 @@ const ApplicationDetails = ({ id }: { id: string }) => {
         const companyData = response.data as CompanyApiResponse;
         setApplicationDetails(companyData);
 
-        if (companyData.banks && companyData.banks.length > 0) {
-          setBank(companyData.banks[0]);
-        } else {
-          setBank(null);
-        }
+        const resolvedBank =
+          companyData.bank ??
+          (companyData.banks && companyData.banks.length > 0
+            ? companyData.banks[0]
+            : null);
+        setBank(
+          resolvedBank
+            ? { ...resolvedBank, company: resolvedBank.company || companyData.id }
+            : null
+        );
 
         if (companyData.company_name) {
           const extractedCompanyData: CompanyDetails = {
             company_name: companyData.company_name,
-            business_type_id: companyData.business_type,
+            business_type_id:
+              resolveBusinessTypePk(companyData.business_type) ?? 0,
             business_type_name: companyData?.business_type_name || "",
             number_of_employees: companyData.number_of_employees,
             estimated_turnover: companyData.estimated_turnover,
@@ -114,11 +130,28 @@ const ApplicationDetails = ({ id }: { id: string }) => {
           setCompany(null);
         }
 
-        if (companyData.contacts && companyData.contacts.length > 0) {
-          setContacts(companyData.contacts);
-        } else {
-          setContacts([]);
+        const mappedContacts: ContactDetails[] = [];
+
+        if (companyData.primary_contact) {
+          mappedContacts.push({
+            id: companyData.primary_contact.id,
+            job_title: companyData.primary_contact.position || "",
+            first_name: companyData.primary_contact.first_name,
+            last_name: companyData.primary_contact.last_name,
+            telephone1: companyData.primary_contact.telephone,
+            telephone2: null,
+            email_address: companyData.primary_contact.email,
+            is_primary: true,
+          });
         }
+
+        if (companyData.contacts && companyData.contacts.length > 0) {
+          mappedContacts.push(
+            ...companyData.contacts.filter((contact) => !contact.is_primary)
+          );
+        }
+
+        setContacts(mappedContacts);
 
         if (companyData.notes && companyData.notes.length > 0) {
           const mappedNotes: Note[] = (companyData.notes as ApiNote[]).map(
@@ -165,9 +198,39 @@ const ApplicationDetails = ({ id }: { id: string }) => {
     }
   }, [id, loadApplicationDetails]);
 
-  const handleViewContract = (meter: MeterDetail) => {
-    setSelectedContract(meter.contractDetails);
-    setIsContractModalOpen(true);
+  const handleViewContract = async (meter: MeterDetail) => {
+    setViewingMeterId(meter.id);
+    try {
+      const response = await getApplicationMeter(meter.id);
+
+      if (response.success && response.data) {
+        setSelectedContract(mapMeterApiToContractDetails(response.data));
+        setIsContractModalOpen(true);
+        return;
+      }
+
+      if (
+        response.errors &&
+        typeof response.errors === "object" &&
+        "authError" in response.errors
+      ) {
+        toast.error("Token expired. Authentication required.");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        router.push("/login");
+        return;
+      }
+
+      toast.error(response.message || "Failed to load meter details");
+      setSelectedContract(meter.contractDetails);
+      setIsContractModalOpen(true);
+    } catch (error) {
+      console.error("Error loading meter for view:", error);
+      toast.error("Failed to load meter details");
+      setSelectedContract(meter.contractDetails);
+      setIsContractModalOpen(true);
+    } finally {
+      setViewingMeterId(null);
+    }
   };
 
   const handleContactUpdate = (updatedContacts: ContactDetails[]) => {
@@ -205,14 +268,15 @@ const ApplicationDetails = ({ id }: { id: string }) => {
   const handleBankUpdate = (updatedBank: BankDetails) => {
     setBank(updatedBank);
 
-    // Update the banks array in applicationDetails if it exists
     if (applicationDetails) {
-      const updatedBanks = applicationDetails.banks.map((b) =>
-        b.id === updatedBank.id ? updatedBank : b
-      );
       setApplicationDetails({
         ...applicationDetails,
-        banks: updatedBanks,
+        bank: updatedBank,
+        banks: applicationDetails.banks
+          ? applicationDetails.banks.map((b) =>
+              b.id === updatedBank.id ? updatedBank : b
+            )
+          : [updatedBank],
       });
     }
 
@@ -250,11 +314,6 @@ const ApplicationDetails = ({ id }: { id: string }) => {
 
   const handleViewMeters = (siteId: number) => {
     setSelectedSiteId((current) => (current === siteId ? null : siteId));
-  };
-
-  const handleMeterAdded = async (_newMeter: Meter) => {
-    // Refetch from server so the meter list has real IDs and contract fields.
-    await loadApplicationDetails(false);
   };
 
   const handleEditMeter = (meter: MeterDetail) => {
@@ -307,70 +366,25 @@ const ApplicationDetails = ({ id }: { id: string }) => {
     });
   };
 
-  // Helper function to parse meter reference and create the reference structure
-  const parseMeterReference = (meterRef: string) => {
-    // Split the meter reference into 8 parts: 1, 2, 3, 3, 2, 4, 4, 3 characters
-    // Example: "S038014441200034589324" -> ["S", "03", "801", "444", "12", "0033", "4580", "324"]
-    const chars = meterRef.split("");
-    let currentIndex = 0;
-
-    const parts = [1, 2, 3, 3, 2, 4, 4, 3].map((count) => {
-      const part = chars.slice(currentIndex, currentIndex + count).join("");
-      currentIndex += count;
-      return part || "0".repeat(count);
-    });
-
-    return {
-      indicator: parts[0] || "S",
-      topRow: [parts[1] || "00", parts[2] || "000", parts[3] || "000"],
-      bottomRow: [
-        parts[4] || "00",
-        parts[5] || "0000",
-        parts[6] || "0000",
-        parts[7] || "000",
-      ],
-    };
-  };
-
   // Helper function to map API meter data to MeterDetail format
   const mapMeterToMeterDetail = (
     meter: Meter | ApiMeter,
     siteName: string
   ): MeterDetail => {
-    const meterType =
-      "meter_type_name" in meter
-        ? meter.meter_type_name || "Electricity"
-        : "Electricity";
+    const meterType = resolveMeterTypeLabel(meter);
 
     return {
       id: meter.meterid,
       type: meterType,
       siteName: siteName,
-      reference: parseMeterReference(meter.meter_reference),
+      // Prefer quote MPAN segments / mpan_mrpn_text; meter_reference is often bottomline only.
+      reference: buildMeterReferenceForDisplay(meter),
       referenceString: meter.meter_reference,
       quoteDetails: {
-        sold: meter.latest_issold || false,
-        submitted: meter.latest_isprocessed || false,
+        sold: coerceMeterBoolean(meter.latest_issold),
+        submitted: coerceMeterBoolean(meter.latest_isprocessed),
       },
-      contractDetails: {
-        contractCommission: "0.00",
-        startDate: new Date().toLocaleDateString(),
-        soldSupplier: meter.latestsoldsuppliername || "N/A",
-        tariff: meter.latesttariffname || "N/A",
-        term: meter.latestterm?.toString() || "0",
-        units: "kWh",
-        uplifts: "0.00",
-        rates: {
-          standingCharge: meter.latestSoldStandingCharge || "0.00",
-          dayRate: meter.latestSoldDayRate || "0.00",
-        },
-        savings: "0.00",
-        yearlyCost: "0.00",
-        soldDate: new Date().toLocaleDateString(),
-        contractType: "Standard",
-        submitted: meter.latest_isprocessed ? "Yes" : "No",
-        isProcessed: meter.latest_isprocessed ? "Yes" : "No",
-      },
+      contractDetails: mapMeterListItemToContractDetails(meter),
     };
   };
 
@@ -444,6 +458,7 @@ const ApplicationDetails = ({ id }: { id: string }) => {
         <BankDetailsSection
           bankDetails={bank}
           onBankUpdate={handleBankUpdate}
+          companyId={id}
         />
       ) : (
         <div className="bg-[#F7FAFF] rounded-lg shadow p-6">
@@ -469,6 +484,7 @@ const ApplicationDetails = ({ id }: { id: string }) => {
           onMeterDeleted={() => loadApplicationDetails(false)}
           onEditMeter={handleEditMeter}
           onAddMeter={() => setIsAddMeterModalOpen(true)}
+          viewingMeterId={viewingMeterId}
         />
       )}
 
@@ -511,7 +527,6 @@ const ApplicationDetails = ({ id }: { id: string }) => {
             applicationDetails?.sites.find((s) => s.id === selectedSiteId)
               ?.postcode || ""
           }
-          onMeterAdded={handleMeterAdded}
         />
       )}
 

@@ -15,6 +15,30 @@ import { uploadLoaFileAction } from "@/lib/actions/uploadLoaFile";
 /** Ticket API path used by TicketForm; same payload shape for LOA-created tickets. */
 const TICKETS_API_ENDPOINT = "/api/v1/auth/web/utility/tickets/";
 
+/**
+ * Optional prefill values from Submitted Sales Details (or similar).
+ * Only non-empty values are applied, and only onto fields the user has not edited yet.
+ */
+export interface LoaFormInitialValues {
+  customerName?: string | null;
+  mpanMprn?: string | null;
+  contactNumber?: string | null;
+  email?: string | null;
+  designation?: string | null;
+  businessName?: string | null;
+  companyRegNo?: string | null;
+  currentSupplier?: string | null;
+  businessAddress?: string | null;
+  /** Maps to Yes/No radios; omit when unknown. */
+  microBusiness?: "yes" | "no" | null;
+  /** Service checkboxes; only applied when none are checked yet. */
+  services?: {
+    electricity?: boolean;
+    gas?: boolean;
+    waste?: boolean;
+  };
+}
+
 /** LOA form: company selection and Generate LOA action only. */
 interface LOAFormProps {
   /** Selected query type from `AddTicket.tsx` (e.g. "OTHERS"). Kept for future use. */
@@ -26,11 +50,23 @@ interface LOAFormProps {
    */
   initialCompanyId?: string | null;
   /**
+   * Prefill LOA fields from submitted sale / company detail.
+   * Empty / null / "N/A" values are ignored; existing user input is not overwritten.
+   */
+  initialValues?: LoaFormInitialValues | null;
+  /**
    * Optional callback when LOA is sent successfully. When provided, this is
    * called instead of redirecting to the tickets page (e.g. to close a modal
    * and refetch details so the user stays on the current page).
    */
   onSuccessCallback?: () => void | Promise<void>;
+}
+
+/** Treat blank / "N/A" display placeholders as missing for autofill. */
+function presentPrefill(value?: string | null): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || trimmed.toUpperCase() === "N/A") return "";
+  return trimmed;
 }
 
 interface Company {
@@ -94,6 +130,7 @@ const REQUEST_TYPE_OPTIONS = [
 export default function LOAForm({
   queryType,
   initialCompanyId,
+  initialValues,
   onSuccessCallback,
 }: LOAFormProps) {
   const router = useRouter();
@@ -226,6 +263,112 @@ export default function LOAForm({
       );
     }
   }, [initialCompanyId, companyId]);
+
+  /**
+   * Seed all LOA inputs from parent submitted details when values exist.
+   * Only fill fields that are still empty so we do not overwrite user edits.
+   * Depends on primitive fields (not the object identity) so parent re-renders
+   * with a new `initialValues` literal do not keep re-applying.
+   */
+  useEffect(() => {
+    if (!initialValues) return;
+
+    const prefill = {
+      customerName: presentPrefill(initialValues.customerName),
+      mpanMprn: presentPrefill(initialValues.mpanMprn),
+      contactNumber: presentPrefill(initialValues.contactNumber),
+      email: presentPrefill(initialValues.email),
+      designation: presentPrefill(initialValues.designation),
+      businessName: presentPrefill(initialValues.businessName),
+      companyRegNo: presentPrefill(initialValues.companyRegNo),
+      currentSupplier: presentPrefill(initialValues.currentSupplier),
+      businessAddress: presentPrefill(initialValues.businessAddress),
+    };
+
+    const microBusinessPrefill =
+      initialValues.microBusiness === "yes" ||
+      initialValues.microBusiness === "no"
+        ? initialValues.microBusiness
+        : null;
+    const serviceElectricity = Boolean(initialValues.services?.electricity);
+    const serviceGas = Boolean(initialValues.services?.gas);
+    const serviceWaste = Boolean(initialValues.services?.waste);
+
+    const hasTextPrefill = Object.values(prefill).some(Boolean);
+    const hasMicroPrefill = microBusinessPrefill !== null;
+    const hasServicePrefill =
+      serviceElectricity || serviceGas || serviceWaste;
+
+    if (!hasTextPrefill && !hasMicroPrefill && !hasServicePrefill) {
+      return;
+    }
+
+    setFormFields((prev) => {
+      const hasAnyServiceChecked =
+        prev.services.electricity ||
+        prev.services.gas ||
+        prev.services.waste;
+
+      return {
+        ...prev,
+        customerName: prev.customerName.trim()
+          ? prev.customerName
+          : prefill.customerName,
+        mpanMprn: prev.mpanMprn.trim() ? prev.mpanMprn : prefill.mpanMprn,
+        contactNumber: prev.contactNumber.trim()
+          ? prev.contactNumber
+          : prefill.contactNumber,
+        email: prev.email.trim() ? prev.email : prefill.email,
+        designation: prev.designation.trim()
+          ? prev.designation
+          : prefill.designation,
+        businessName: prev.businessName.trim()
+          ? prev.businessName
+          : prefill.businessName,
+        companyRegNo: prev.companyRegNo.trim()
+          ? prev.companyRegNo
+          : prefill.companyRegNo,
+        currentSupplier: prev.currentSupplier.trim()
+          ? prev.currentSupplier
+          : prefill.currentSupplier,
+        businessAddress: prev.businessAddress.trim()
+          ? prev.businessAddress
+          : prefill.businessAddress,
+        microBusiness:
+          prev.microBusiness !== null
+            ? prev.microBusiness
+            : (microBusinessPrefill ?? prev.microBusiness),
+        services: hasAnyServiceChecked
+          ? prev.services
+          : {
+              ...prev.services,
+              electricity: serviceElectricity || prev.services.electricity,
+              gas: serviceGas || prev.services.gas,
+              waste: serviceWaste || prev.services.waste,
+            },
+      };
+    });
+
+    // Keep company id/label in sync when business name is prefilled from details.
+    if (prefill.businessName) {
+      setSelectedCompanyLabel((prev) => prev || prefill.businessName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- primitive deps below avoid object-identity thrashing
+  }, [
+    initialValues?.customerName,
+    initialValues?.mpanMprn,
+    initialValues?.contactNumber,
+    initialValues?.email,
+    initialValues?.designation,
+    initialValues?.businessName,
+    initialValues?.companyRegNo,
+    initialValues?.currentSupplier,
+    initialValues?.businessAddress,
+    initialValues?.microBusiness,
+    initialValues?.services?.electricity,
+    initialValues?.services?.gas,
+    initialValues?.services?.waste,
+  ]);
 
   /** Debounced search: reset to page 1 and fetch when companySearch changes. */
   useEffect(() => {
@@ -570,10 +713,29 @@ export default function LOAForm({
             placeholder={
               isCompanyLoading ? "Loading companies..." : "Select company"
             }
-            options={companyOptions}
-            value={companyOptions.find(
-              (opt) => opt.label === formFields.businessName
-            )}
+            options={
+              formFields.businessName &&
+              !companyOptions.some((opt) => opt.label === formFields.businessName)
+                ? [
+                    {
+                      value: companyId || formFields.businessName,
+                      label: formFields.businessName,
+                    },
+                    ...companyOptions,
+                  ]
+                : companyOptions
+            }
+            value={
+              companyOptions.find(
+                (opt) => opt.label === formFields.businessName
+              ) ??
+              (formFields.businessName
+                ? {
+                    value: companyId || formFields.businessName,
+                    label: formFields.businessName,
+                  }
+                : null)
+            }
             isLoading={isCompanyLoading}
             onInputChange={(inputValue, actionMeta) => {
               if (actionMeta.action === "input-change") {

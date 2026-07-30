@@ -11,7 +11,6 @@ import {
 import Pagination from "@/ui/pagination";
 import { getTicketsList, type TableFilters } from "@/composable/getTableData";
 import { formatDate } from "@/composable/getFormatedDate";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Ticket } from "@/lib/types";
 import { Loader2 } from "lucide-react";
@@ -22,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/modal";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 
 // Action button SVG as a React component
 const PendingActionIcon = () => (
@@ -86,76 +86,34 @@ const QUERY_TYPE_OPTIONS = [
 const TicketsTable = () => {
   const router = useRouter();
 
-  // State for table data and pagination
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
-  const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState("pending");
-  // const [isAddTicketLoading, setIsAddTicketLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [isQueryTypeModalOpen, setIsQueryTypeModalOpen] = useState(false);
   const [isQueryTypeLoading, setIsQueryTypeLoading] = useState(false);
-
-  // State for filters - initialize with pending status filter
   const [filters, setFilters] = useState<TableFilters>({ status: "pending" });
 
-  // Fetch tickets data from API
-  const fetchTickets = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      setIsLoading(true);
-      try {
-        const filters: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
+  const {
+    results: tickets,
+    totalItems,
+    isLoading,
+  } = usePaginatedTableQuery<Ticket>({
+    resource: "tickets",
+    fetcher: (queryFilters) =>
+      getTicketsList(queryFilters) as Promise<
+        import("@/composable/getTableData").TableDataResult<Ticket>
+      >,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: "",
+    filters,
+  });
 
-        const result = await getTicketsList(filters);
-
-        if (result.success && result.data) {
-          setTickets(result.data.results as Ticket[]);
-          setTotalItems(result.data.count);
-        } else {
-          toast.error(result.message || "Failed to fetch tickets");
-          // If authentication error, redirect to login
-          if (
-            result.message?.includes("authentication") ||
-            result.message?.includes("token") ||
-            (result.errors &&
-              typeof result.errors === "object" &&
-              "status" in result.errors &&
-              result.errors.status === 401)
-          ) {
-            router.push("/login");
-          }
-          setTickets([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching tickets:", error);
-        toast.error("An error occurred while fetching tickets");
-        setTickets([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage, router]
-  );
-
-  // Handle view details for a ticket
   const handleViewDetails = (ticket: Ticket) => {
     router.push(`/tickets/${ticket.public_id}`);
   };
 
-  // Format dates for tickets
   const formatTicketDates = useCallback(async (ticketList: Ticket[]) => {
     const datePromises = ticketList.map(async (ticket) => {
       if (ticket.created_at) {
@@ -171,67 +129,46 @@ const TicketsTable = () => {
       results.forEach(({ ticketId, formattedDate }) => {
         newFormattedDates[ticketId] = formattedDate;
       });
-      // setFormattedDates(newFormattedDates); // This line was removed as per the edit hint
     } catch (error) {
       console.error("Error formatting dates:", error);
     }
   }, []);
 
-  // Load initial data
-  useEffect(() => {
-    fetchTickets(currentPage, "", filters);
-  }, [fetchTickets, currentPage, filters]);
-
-  // Format dates when tickets change
   useEffect(() => {
     if (tickets.length > 0) {
       formatTicketDates(tickets);
     }
   }, [tickets, formatTicketDates]);
 
-  // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  // Handle filter button click
-  const handleFilterClick = async (filterValue: string) => {
-    if (isFilterLoading) return; // Prevent multiple clicks while loading
+  const handleFilterClick = (filterValue: string) => {
+    if (isFilterLoading) return;
 
     setActiveFilter(filterValue);
     setIsFilterLoading(true);
 
-    // Create new filters object with status filter
     const newFilters: TableFilters = { ...filters };
 
     if (filterValue === "pending") {
-      // Filter for pending tickets
       newFilters.status = "pending";
     } else if (filterValue === "closed") {
-      // Filter for closed tickets
       newFilters.status = "closed";
     } else {
-      // Show all tickets - remove status filter
       delete newFilters.status;
     }
 
     setFilters(newFilters);
-    setCurrentPage(1); // Reset to first page when filtering
-
-    // Fetch data with new filters
-    try {
-      await fetchTickets(1, "", newFilters);
-    } finally {
-      setIsFilterLoading(false);
-    }
+    setCurrentPage(1);
+    setIsFilterLoading(false);
   };
 
-  // Handle add ticket button click - open modal
   const handleAddTicket = () => {
     setIsQueryTypeModalOpen(true);
   };
 
-  // Handle query type selection from modal
   const handleQueryTypeSelect = (queryType: string) => {
     setIsQueryTypeLoading(true);
     router.push(`/tickets/add-ticket?queryType=${encodeURIComponent(queryType)}`);

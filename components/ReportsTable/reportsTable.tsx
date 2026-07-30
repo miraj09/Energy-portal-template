@@ -24,6 +24,7 @@ import {
 } from "@/components/ExportContractTable/type";
 import { CustomSelect, type SelectOption } from "@/ui/select";
 import { getDropdown } from "@/lib/actions/getDropdown";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 
 interface AgentApiRecord {
   id?: number | string;
@@ -38,11 +39,8 @@ const ReportsTable = () => {
   const router = useRouter();
 
   // State for table data and pagination
-  const [reports, setReports] = useState<ContactRecord[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
-  const [isLoading, setIsLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
 
   // State for search and filters
@@ -67,6 +65,22 @@ const ReportsTable = () => {
 
   // Get current state for this specific table instance
   const currentState = getInstanceState("reports-table");
+
+  const {
+    results: reports,
+    totalItems,
+    isLoading,
+  } = usePaginatedTableQuery<ContactRecord>({
+    resource: "reports",
+    fetcher: (queryFilters) =>
+      getReportsList(queryFilters) as Promise<
+        import("@/composable/getTableData").TableDataResult<ContactRecord>
+      >,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters,
+  });
 
   /** Coerce unknown API values to a string safe for table cells. */
   const toDisplayString = (value: unknown): string => {
@@ -104,6 +118,20 @@ const ReportsTable = () => {
       return dateB - dateA;
     });
     return sorted[0] ?? null;
+  };
+
+  const getSubmittedBy = (record: ContactRecord): string => {
+    const latest = getLatestSubmittedSale(record);
+    const submittedBy = record.submitted_by ?? latest?.submitted_by ?? null;
+
+    if (submittedBy == null) return "N/A";
+
+    // API returns submitted_by as { id, name, username }
+    if (typeof submittedBy === "object" && "name" in submittedBy) {
+      return toDisplayString(submittedBy.name);
+    }
+
+    return toDisplayString(submittedBy);
   };
 
   const getBottomlineFromContact = (record: ContactRecord): string | null => {
@@ -203,65 +231,6 @@ const ReportsTable = () => {
       null;
     return formatDateTimeWithSeconds(raw);
   };
-
-  // Fetch reports data from API
-  const fetchReports = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      setIsLoading(true);
-      try {
-        const requestFilters: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
-
-        const result = await getReportsList(requestFilters);
-
-        if (result.success && result.data) {
-          const data = result.data;
-          if (data.results && data.results.length > 0) {
-            setReports(data.results as ContactRecord[]);
-            setTotalItems(data.count);
-          } else {
-            setReports([]);
-            setTotalItems(0);
-          }
-        } else {
-          toast.error(result.message || "Failed to fetch reports");
-          if (
-            result.message?.includes("authentication") ||
-            result.message?.includes("token") ||
-            (result.errors &&
-              typeof result.errors === "object" &&
-              "status" in (result.errors as Record<string, unknown>) &&
-              (result.errors as { status?: number }).status === 401)
-          ) {
-            router.push("/login");
-          }
-          setReports([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-        toast.error("An error occurred while fetching reports");
-        setReports([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage, router]
-  );
-
-  // Load initial data
-  useEffect(() => {
-    fetchReports(currentPage, searchTerm, filters);
-  }, [fetchReports, currentPage, searchTerm, filters]);
 
   const fetchAgentOptions = useCallback(
     async ({
@@ -755,7 +724,7 @@ const ReportsTable = () => {
                   const row = report as Record<string, unknown>;
                   return (
                   <TableRow key={report.id || idx}>
-                    <TableCell>{toDisplayString(row.submitted_by)}</TableCell>
+                    <TableCell>{getSubmittedBy(report)}</TableCell>
                     <TableCell>{getCompanyName(report)}</TableCell>
                     <TableCell
                       className="w-48 max-w-48 break-words whitespace-normal"

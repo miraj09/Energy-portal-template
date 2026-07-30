@@ -2,6 +2,7 @@ import AllUsersTable from "@/components/account/AllUsersTable";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { FilterAwarePagination } from "@/components/ui/FilterAwarePagination";
 import { getResource } from "@/lib/baseQueries";
+import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 import { isSessionExpired } from "@/lib/constants/authErrors";
 import type { UserRecord } from "@/lib/types/user";
 
@@ -31,7 +32,7 @@ export default async function UserListPage({
     }
 
     const [usersRes, rolesRes] = await Promise.all([
-      getResource(apiUrl, {}, { section: "authentication", action: "view_user_list" }),
+      getResource(apiUrl, {}, { section: SIDEBAR_NAVIGATION_SECTION, action: "view_user_list" }),
       getResource("api/v1/auth/web/role-list/"),
     ]);
 

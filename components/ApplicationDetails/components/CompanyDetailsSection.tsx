@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/ui/card";
 import { SelectOption } from "@/ui/select";
 import { patchMethod } from "@/lib/actions/patchMethod";
 import { getDropdown } from "@/lib/actions/getDropdown";
+import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
+import { getApiErrorMessage } from "@/composable/getApiErrorMessage";
 
 // Yes/No options for micro business
 const microBusinessOptions: SelectOption[] = [
@@ -142,7 +144,7 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
     },
     {
       label: "Business Type",
-      value: company.business_type_id.toString(),
+      value: String(resolveBusinessTypePk(company.business_type_id) ?? ""),
       type: "select",
       key: "business_type_id",
       options: businessTypeOptions,
@@ -261,8 +263,9 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
         return;
       }
 
-      // Prepare the data to send to the API
-      const companyData = {
+      const businessTypePk = resolveBusinessTypePk(company.business_type_id);
+
+      const companyData: Record<string, unknown> = {
         company_name: company.company_name,
         number_of_employees: company.number_of_employees,
         estimated_turnover: company.estimated_turnover,
@@ -273,8 +276,11 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
         current_address_line3: company.current_address_line3 || "",
         current_address_line4: company.current_address_line4 || "",
         registration_no: company.registration_no,
-        business_type: company.business_type_id,
       };
+
+      if (businessTypePk != null) {
+        companyData.business_type = businessTypePk;
+      }
 
       
 
@@ -303,12 +309,15 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
           toast.error("Authentication failed. Please log in again.");
           router.push("/login");
         } else {
-          throw new Error(response.message || "Failed to save company details");
+          toast.error(getApiErrorMessage(response));
+          return;
         }
       }
     } catch (error) {
       console.error("Error saving company details:", error);
-      toast.error("Failed to save company details. Please try again.");
+      const message =
+        error instanceof Error ? error.message : "Failed to save company details";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }

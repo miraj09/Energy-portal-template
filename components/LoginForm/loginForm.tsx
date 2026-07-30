@@ -29,6 +29,7 @@ export default function LoginForm(): JSX.Element {
     message?: string;
     errors?: Record<string, string[]>;
     userData?: UserRecord;
+    defaultRoute?: string;
   };
 
   const [state, formAction, isPending = false] = useActionState<
@@ -68,9 +69,9 @@ export default function LoginForm(): JSX.Element {
       }
     }
 
-    router.push("/dashboard");
+    router.push(state.defaultRoute || "/dashboard");
     router.refresh();
-  }, [state.success, state.userData, router]);
+  }, [state.success, state.userData, state.defaultRoute, router]);
 
   return (
     <div className="w-full min-h-screen bg-[#f7faff] flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -230,9 +231,10 @@ export default function LoginForm(): JSX.Element {
           <Image
             width={187}
             height={70}
-            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-cover"
+            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-contain"
             alt={branding.logoAlt}
             src={branding.logoSrc}
+            unoptimized
           />
         </div>
       </div>

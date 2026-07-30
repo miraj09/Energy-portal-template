@@ -7,6 +7,7 @@ import TableActions from "@/components/ui/TableActions";
 import ViewRoleModal from "@/components/account/ViewRoleModal";
 import EditRoleModal from "@/components/account/EditRoleModal";
 import PermissionGate from "@/components/auth/PermissionGate";
+import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 import { deleteRole } from "@/lib/actions/deleteRole";
 import type { RoleRecord } from "@/lib/types/role";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export default function AllRolesTable({
               Search
             </button>
           </form>
-          <PermissionGate section="authentication" action="add_role">
+          <PermissionGate section={SIDEBAR_NAVIGATION_SECTION} action="add_role">
             <button
               type="button"
               onClick={() => router.push("/users/add-new-role")}

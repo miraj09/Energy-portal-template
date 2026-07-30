@@ -2,7 +2,8 @@
 
 import { createContext, useContext } from "react";
 
-type MenuNode = {
+export type MenuNode = {
+  id: string;
   label: string;
   href?: string;
   subItems?: MenuNode[];

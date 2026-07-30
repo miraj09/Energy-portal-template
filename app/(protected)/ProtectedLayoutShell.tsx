@@ -14,6 +14,7 @@ import { useLogoutForm } from "@/components/LogoutForm";
 import { LogoutConfirmationModal } from "@/components/LogoutConfirmationModal";
 import { usePathname } from "next/navigation";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import RoutePermissionGuard from "@/components/auth/RoutePermissionGuard";
 
 const ProtectedLayoutContent = ({ children }: { children: React.ReactNode }) => {
   const { isSidebarCollapsed } = useSidebar();
@@ -76,7 +77,7 @@ const ProtectedLayoutContent = ({ children }: { children: React.ReactNode }) => 
             <DynamicBreadcrumb />
           </div>
         ) : null}
-        {children}
+        <RoutePermissionGuard>{children}</RoutePermissionGuard>
       </main>
 
       <LogoutConfirmationModal

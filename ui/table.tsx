@@ -9,7 +9,7 @@ const Table = React.forwardRef<
     <table
       ref={ref}
       className={cn(
-        "w-full caption-bottom text-sm bg-white border-separate border-spacing-0",
+        "w-full caption-bottom text-sm bg-card text-card-foreground border-separate border-spacing-0 [color-scheme:light]",
         className
       )}
       {...props}
@@ -24,7 +24,10 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn("bg-[#2986cc]", className)}
+    className={cn(
+      "bg-primary text-primary-foreground [&_tr]:bg-transparent [&_tr]:hover:bg-transparent [&_tr]:border-none",
+      className
+    )}
     {...props}
   />
 ));
@@ -64,7 +67,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "bg-white border-b border-[#e0e0e0] last:border-b-0 transition-colors hover:bg-[#f5faff] focus:outline-none",
+      "bg-card border-b border-border last:border-b-0 transition-colors hover:bg-primary-soft/40 focus:outline-none",
       className
     )}
     tabIndex={-1}
@@ -81,7 +84,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-3 text-left align-middle font-bold text-white whitespace-nowrap",
+      "h-12 px-3 text-left align-middle font-bold text-primary-foreground whitespace-nowrap",
       className
     )}
     {...props}
@@ -96,7 +99,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "h-12 px-3 align-middle text-[#222] whitespace-nowrap focus:outline-none",
+      "h-12 px-3 align-middle text-card-foreground whitespace-nowrap focus:outline-none",
       className
     )}
     style={{ cursor: 'default' }}

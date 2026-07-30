@@ -13,7 +13,6 @@ import {
 import Image from "next/image";
 import { NavigationMenu } from "@/components/NavigationMenu/NavigationMenu";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { branding } from "@/lib/config/branding";
 import { useLogoutForm } from "@/components/LogoutForm";
 import { LogoutConfirmationModal } from "@/components/LogoutConfirmationModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/modal";
@@ -24,6 +23,7 @@ import { uploadImageAction } from "@/lib/actions/uploadImage";
 import { toast } from "sonner";
 import { getRoleDisplayNames } from "@/lib/user/mapLoginUserData";
 import type { UserRecord } from "@/lib/types/user";
+import { branding } from "@/lib/config/branding";
 
 const USER_STORAGE_KEY = "energy_user_Data";
 
@@ -280,9 +280,10 @@ export const Header = (): JSX.Element => {
               <Image
                 width={139}
                 height={52}
-                className="w-[139px] h-[52px] object-cover"
+                className="w-[139px] h-[52px] object-contain"
                 alt={branding.logoAlt}
                 src={branding.logoSrc}
+                unoptimized
               />
               <Button
                 variant="ghost"

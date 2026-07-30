@@ -47,8 +47,7 @@ export function useTokenRefresh(options: UseTokenRefreshOptions = {}) {
 
   const startTokenRefresh = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    // Trigger an immediate refresh attempt when starting the loop
-    refreshToken();
+    // Interval-only refresh — avoid an eager refresh on every protected mount.
     intervalRef.current = setInterval(refreshToken, refreshInterval);
   }, [refreshInterval, refreshToken]);
 

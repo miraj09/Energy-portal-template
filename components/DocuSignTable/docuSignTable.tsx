@@ -11,7 +11,7 @@ import {
 import Pagination from "@/ui/pagination";
 import TableHeaderComponent from "@/components/TableHeader";
 import { useMultipleTableHeaders } from "@/hooks/useTableHeaderState";
-import { getCompanyList } from "@/composable/getTableData";
+import { getCompanyList, type TableFilters } from "@/composable/getTableData";
 import { usePostApiCall } from "@/composable/postApiCall";
 import type {
   Company,
@@ -29,6 +29,8 @@ import { Button } from "@/ui/button";
 import { Label } from "@/ui/label";
 import { Textarea } from "@/ui/textarea";
 import { toast } from "sonner";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
+import { useMemo } from "react";
 
 // Local helper type that augments `Company` with an optional `contacts` array.
 // The backend response for the company list may or may not include contacts,
@@ -173,12 +175,39 @@ function mapCompaniesToDocuSignRows(
 const DocuSignTable = () => {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [activeFilter, setActiveFilter] = React.useState(getInitialDocuSignTab);
-  const [docuSignData, setDocuSignData] = React.useState<DocuSignRow[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [totalItems, setTotalItems] = React.useState(0);
   const [searchTerm, setSearchTerm] = React.useState("");
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
   const itemsPerPage = 10;
+
+  const loaStatusFilters = useMemo<TableFilters>(
+    () => ({
+      loa_esign_status: getLoaStatusForTab(activeFilter),
+    }),
+    [activeFilter]
+  );
+
+  const {
+    results: companyResults,
+    totalItems,
+    isLoading,
+    refetch: refetchCompanies,
+  } = usePaginatedTableQuery<CompanyWithContacts>({
+    resource: "docusign-companies",
+    fetcher: (queryFilters) =>
+      getCompanyList(queryFilters) as Promise<
+        import("@/composable/getTableData").TableDataResult<CompanyWithContacts>
+      >,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters: loaStatusFilters,
+    extraKey: [activeFilter],
+  });
+
+  const docuSignData = useMemo(
+    () => mapCompaniesToDocuSignRows(companyResults),
+    [companyResults]
+  );
 
   // Void envelope modal state
   const [isVoidModalOpen, setIsVoidModalOpen] = React.useState(false);
@@ -218,9 +247,7 @@ const DocuSignTable = () => {
       setIsVoidModalOpen(false);
       setVoidReason("");
       setSelectedEnvelopeId(null);
-      // Refresh the table data to reflect the voided status
-      const statusForTab = getLoaStatusForTab(activeFilter);
-      void fetchCompanies(currentPage, searchTerm, statusForTab);
+      void refetchCompanies();
     },
     onError: (message) => {
       toast.error(message || "Failed to void envelope");
@@ -237,65 +264,12 @@ const DocuSignTable = () => {
   } = usePostApiCall({
     onSuccess: () => {
       toast.success("LOA re-sent successfully.");
-      const statusForTab = getLoaStatusForTab(activeFilter);
-      void fetchCompanies(currentPage, searchTerm, statusForTab);
+      void refetchCompanies();
     },
     onError: (message) => {
       toast.error(message || "Failed to re-send LOA");
     },
   });
-
-  /**
-   * Fetches one page of companies from the backend for the active tab's status.
-   * Each tab (Pending / Approved / Cancelled) calls the API with the corresponding
-   * loa_esign_status (SENT / SIGNED_BACK / VOID). Pagination is server-side.
-   */
-  const fetchCompanies = React.useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      loaStatus: string = LOA_STATUS.SENT
-    ) => {
-      setIsLoading(true);
-      try {
-        const result = await getCompanyList({
-          page,
-          page_size: itemsPerPage,
-          search: search.trim() || undefined,
-          loa_esign_status: loaStatus,
-        });
-
-        if (result.success && result.data) {
-          const companies = result.data.results as CompanyWithContacts[];
-          const totalFromApi = result.data.count;
-          const rows = mapCompaniesToDocuSignRows(companies);
-          setDocuSignData(rows);
-          setTotalItems(totalFromApi);
-        } else {
-          console.error(
-            "Failed to fetch companies for DocuSign table:",
-            result.message,
-            result.errors
-          );
-          setDocuSignData([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching companies for DocuSign table:", error);
-        setDocuSignData([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage]
-  );
-
-  // Fetch when page, search, or tab (status) changes. Each tab has its own API call and pagination.
-  React.useEffect(() => {
-    const statusForTab = getLoaStatusForTab(activeFilter);
-    void fetchCompanies(currentPage, searchTerm, statusForTab);
-  }, [fetchCompanies, currentPage, searchTerm, activeFilter]);
 
   /** Current page rows from API; no client-side slice (pagination is server-side). */
   const paginatedDocuSignData = docuSignData;

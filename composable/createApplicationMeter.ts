@@ -1,14 +1,26 @@
 import { postMethod } from "@/lib/actions/postMethod";
 import { Meter } from "@/components/ApplicationDetails/types";
+import type { FlatQuotePayload } from "@/composable/meterQuoteForm";
+import {
+  extractQuoteIdFromApiResponse,
+  patchQuoteHeader,
+} from "@/composable/quoteHeaderApi";
 
 const CREATE_METER_ENDPOINT = "/api/v1/auth/web/core/meter/";
 
-export interface CreateApplicationMeterPayload {
+/** Minimal meter fields for the application quote flow (quote-header created separately). */
+export interface CreateApplicationMeterBasicPayload {
   company_id: string;
   site_id: number;
   meter_type: "Electricity" | "Gas";
   meter_reference: string;
-  quote_payload: Record<string, unknown>;
+}
+
+export interface CreateApplicationMeterPayload
+  extends CreateApplicationMeterBasicPayload {
+  quote_payload: FlatQuotePayload;
+  /** Required when updating an existing meter's quote rates. */
+  quote_id?: number;
 }
 
 export interface CreateApplicationMeterResponse {
@@ -16,11 +28,12 @@ export interface CreateApplicationMeterResponse {
   data?: Meter;
   message?: string;
   errors?: unknown;
+  quoteId?: number;
 }
 
 /** Fallback when API succeeds but returns an unexpected shape. */
 function buildFallbackMeter(
-  payload: CreateApplicationMeterPayload
+  payload: CreateApplicationMeterBasicPayload
 ): Meter {
   const now = new Date().toISOString();
 
@@ -69,27 +82,53 @@ function buildFallbackMeter(
 
 function mapApiResponseToMeter(
   data: unknown,
-  payload: CreateApplicationMeterPayload
+  payload: CreateApplicationMeterBasicPayload
 ): Meter {
-  if (data && typeof data === "object" && "meterid" in data) {
-    return data as Meter;
+  if (data && typeof data === "object") {
+    if ("meterid" in data && (data as Meter).meterid) {
+      return data as Meter;
+    }
+    if ("id" in data && typeof (data as { id: unknown }).id === "number") {
+      return {
+        ...buildFallbackMeter(payload),
+        meterid: (data as { id: number }).id,
+      };
+    }
   }
   return buildFallbackMeter(payload);
 }
 
+/** Resolve meter primary key from create-meter API response. */
+export function extractMeterIdFromApiResponse(
+  data: unknown
+): number | null {
+  if (data && typeof data === "object") {
+    if ("meterid" in data && typeof (data as Meter).meterid === "number") {
+      return (data as Meter).meterid;
+    }
+    if ("id" in data && typeof (data as { id: unknown }).id === "number") {
+      return (data as { id: number }).id;
+    }
+  }
+  return null;
+}
+
+function resolveMeterTypeId(meterType: "Electricity" | "Gas"): number {
+  return meterType === "Gas" ? 1 : 2;
+}
+
 /**
- * Create a meter for an application site via POST /api/v1/auth/web/core/meter/.
+ * Create a meter with only site, type, and reference.
+ * The API auto-creates a linked quote-header; patch rates separately if needed.
  */
-export async function createApplicationMeter(
-  payload: CreateApplicationMeterPayload
+export async function createApplicationMeterBasic(
+  payload: CreateApplicationMeterBasicPayload
 ): Promise<CreateApplicationMeterResponse> {
   const response = await postMethod(
     {
-      company: payload.company_id,
       site: payload.site_id,
-      meter_type: payload.meter_type,
+      meter_type: resolveMeterTypeId(payload.meter_type),
       meter_reference: payload.meter_reference,
-      ...payload.quote_payload,
     },
     CREATE_METER_ENDPOINT
   );
@@ -102,8 +141,58 @@ export async function createApplicationMeter(
     };
   }
 
+  const quoteId = extractQuoteIdFromApiResponse(response.data) ?? undefined;
+
   return {
     success: true,
     data: mapApiResponseToMeter(response.data, payload),
+    quoteId,
+  };
+}
+
+/**
+ * Create a meter, then PATCH the auto-created quote-header with flat rate fields.
+ */
+export async function createApplicationMeter(
+  payload: CreateApplicationMeterPayload
+): Promise<CreateApplicationMeterResponse> {
+  const meterResponse = await createApplicationMeterBasic(payload);
+
+  if (!meterResponse.success) {
+    return meterResponse;
+  }
+
+  const quoteId =
+    meterResponse.quoteId ??
+    extractQuoteIdFromApiResponse(meterResponse.data) ??
+    null;
+
+  if (!quoteId) {
+    return {
+      success: false,
+      message: "Meter created but no quote ID was returned to save rates.",
+      data: meterResponse.data,
+    };
+  }
+
+  const quoteResponse = await patchQuoteHeader(quoteId, payload.quote_payload);
+
+  if (!quoteResponse.success) {
+    return {
+      success: false,
+      message:
+        quoteResponse.message ||
+        "Meter created but quote rates could not be saved.",
+      data: meterResponse.data,
+      errors: quoteResponse.errors,
+      quoteId,
+    };
+  }
+
+  return {
+    success: true,
+    data: meterResponse.data,
+    quoteId,
+    message: quoteResponse.message || "Meter and quote saved successfully",
   };
 }

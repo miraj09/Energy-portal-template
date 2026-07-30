@@ -17,6 +17,11 @@ import {
   TableRow,
 } from "@/ui/table";
 import { getDropdown } from "@/lib/actions/getDropdown";
+import {
+  mapInvoiceListToPaidHistoryRows,
+  PaidHistoryTableRow,
+  resolveInvoiceListFromPayload,
+} from "@/composable/invoiceDisplay";
 import { toast } from "sonner";
 import { Loader2, Upload, X } from "lucide-react";
 import { usePostApiCall } from "@/composable/postApiCall";
@@ -33,6 +38,7 @@ import {
   DialogDescription,
 } from "@/ui/modal";
 import LOAForm from "@/components/AddTicket/components/LOAForm";
+import { getBottomlineFromCompanyDetail } from "@/composable/getBottomlineFromCompanyDetail";
 
 // Format date to match screenshot: "07 November 2025 3:14 pm"
 const formatDateWithMonthName = (
@@ -119,6 +125,8 @@ interface SubmittedSaleDetails {
     is_micro_business?: boolean;
     business_type_name?: string;
     contract_type?: string;
+    /** Same field the submitted-sales table uses for Supplier Name. */
+    sold_supplier_name?: string;
     sold_supplier_name_display?: string;
     contacts?: Array<{
       id?: string;
@@ -172,6 +180,15 @@ interface SubmittedSaleDetails {
         };
       }>;
     }>;
+    bank?: {
+      id?: number;
+      bank_name?: string;
+      sort_code?: string;
+      account_name?: string;
+      account_number?: string;
+      is_deleted?: boolean;
+      is_active?: boolean;
+    } | null;
     banks?: Array<{
       id: number;
       bank_name?: string;
@@ -249,25 +266,6 @@ interface SubmittedSaleDetails {
   }>;
 }
 
-/** Paginated invoice list returned by GET /api/v1/auth/web/core/invoice/?company_id= */
-interface CompanyInvoiceApiRow {
-  id: string;
-  invoice_datetime?: string | null;
-  total_received?: string | null;
-  vat?: string | null;
-  total?: string | null;
-  reference?: string | null;
-  notes?: string | null;
-  company?: { company_name?: string | null } | null;
-}
-
-interface CompanyInvoiceListPayload {
-  count?: number;
-  next?: string | null;
-  previous?: string | null;
-  results?: CompanyInvoiceApiRow[];
-}
-
 interface SubmittedSalesDetailsProps {
   id: string;
 }
@@ -299,7 +297,7 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
   /** Invoice / paid history for this company (from core invoice API). */
   const [isPaidHistoryModalOpen, setIsPaidHistoryModalOpen] = useState(false);
   const [paidHistoryInvoices, setPaidHistoryInvoices] = useState<
-    CompanyInvoiceApiRow[]
+    PaidHistoryTableRow[]
   >([]);
   const [isLoadingPaidHistory, setIsLoadingPaidHistory] = useState(false);
   /**
@@ -377,8 +375,8 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
         return;
       }
 
-      const payload = response.data as CompanyInvoiceListPayload | undefined;
-      setPaidHistoryInvoices(payload?.results ?? []);
+      const invoiceRows = resolveInvoiceListFromPayload(response.data);
+      setPaidHistoryInvoices(mapInvoiceListToPaidHistoryRows(invoiceRows));
     } catch (error) {
       console.error("Paid history fetch error:", error);
       toast.error("An error occurred while loading paid history");
@@ -846,8 +844,9 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
           ? directorLastName
           : "N/A");
 
-  // Get supplier details - use sold_supplier_name_display from company_detail
+  // Match submitted-sales table: prefer company.sold_supplier_name
   const supplierName =
+    details?.company?.sold_supplier_name ||
     details?.company?.sold_supplier_name_display ||
     details?.sold_supplier_name ||
     details?.supplier?.supplier_name ||
@@ -1003,6 +1002,38 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
             <LOAForm
               queryType="LOA"
               initialCompanyId={details?.company?.id ?? null}
+              initialValues={{
+                customerName: contactName !== "N/A" ? contactName : null,
+                mpanMprn:
+                  getBottomlineFromCompanyDetail(details?.company) ?? null,
+                contactNumber:
+                  primaryContact?.telephone1?.trim() ||
+                  primaryContact?.telephone2?.trim() ||
+                  primaryContact?.telephone3?.trim() ||
+                  null,
+                email:
+                  contactEmail !== "N/A" ? contactEmail : null,
+                designation:
+                  contactJobTitle !== "N/A" ? contactJobTitle : null,
+                businessName:
+                  businessName !== "N/A" ? businessName : null,
+                companyRegNo:
+                  registrationNo !== "N/A" ? registrationNo : null,
+                currentSupplier:
+                  supplierName !== "N/A" ? supplierName : null,
+                businessAddress:
+                  currentAddress !== "N/A" ? currentAddress : null,
+                microBusiness:
+                  details?.company?.is_micro_business === true
+                    ? "yes"
+                    : details?.company?.is_micro_business === false
+                      ? "no"
+                      : null,
+                services: {
+                  electricity: /electric/i.test(contractType),
+                  gas: /gas/i.test(contractType),
+                },
+              }}
               onSuccessCallback={async () => {
                 setIsLoaFormOpen(false);
                 // Force LOA status to SENT so "Generate LOA" hides and status badge shows (backend may not have updated yet)
@@ -1060,25 +1091,21 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="whitespace-nowrap text-white">
+                      <TableHead className="whitespace-nowrap">
                         Company name
                       </TableHead>
-                      <TableHead className="whitespace-nowrap text-white">
+                      <TableHead className="whitespace-nowrap">
                         Invoice date
                       </TableHead>
-                      <TableHead className="whitespace-nowrap text-white">
+                      <TableHead className="whitespace-nowrap">
                         Total received
                       </TableHead>
-                      <TableHead className="whitespace-nowrap text-white">
-                        VAT
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-white">
+                      <TableHead className="whitespace-nowrap">VAT</TableHead>
+                      <TableHead className="whitespace-nowrap">
                         Total (incl. VAT)
                       </TableHead>
-                      <TableHead className="min-w-[120px] text-white">
-                        Notes
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap text-white">
+                      <TableHead className="min-w-[120px]">Notes</TableHead>
+                      <TableHead className="whitespace-nowrap">
                         Reference
                       </TableHead>
                     </TableRow>
@@ -1087,7 +1114,7 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
                     {paidHistoryInvoices.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell className="font-medium">
-                          {row.company?.company_name?.trim() || "—"}
+                          {row.company_name || "—"}
                         </TableCell>
                         <TableCell>
                           {row.invoice_datetime
@@ -1098,9 +1125,9 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
                         <TableCell>{row.vat ?? "—"}</TableCell>
                         <TableCell>{row.total ?? "—"}</TableCell>
                         <TableCell className="max-w-[200px] break-words text-gray-700">
-                          {row.notes?.trim() ? row.notes : "—"}
+                          {row.notes || "—"}
                         </TableCell>
-                        <TableCell>{row.reference?.trim() || "—"}</TableCell>
+                        <TableCell>{row.reference || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1594,12 +1621,13 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
 
                               const isMpan = !!mpanDetails.is_mpan;
                               const isMrpn = !!mpanDetails.is_mrpn;
+                              // Topline matches electricity quote top row: Profile Class, MTC, LLF
                               const mpanTopline =
                                 isMpan &&
-                                mpanDetails.LLF &&
+                                mpanDetails.profileclass &&
                                 mpanDetails.MTC &&
-                                mpanDetails.Region
-                                  ? `${mpanDetails.LLF}${mpanDetails.MTC}${mpanDetails.Region}`
+                                mpanDetails.LLF
+                                  ? `${mpanDetails.profileclass}${mpanDetails.MTC}${mpanDetails.LLF}`
                                   : "";
 
                               if (!isMpan && !isMrpn) {
@@ -1955,79 +1983,71 @@ const SubmittedSalesDetails = ({ id }: SubmittedSalesDetailsProps) => {
                 <h3 className="text-lg font-semibold text-[#363636] mb-4">
                   Bank details
                 </h3>
-                {details?.company?.banks && details.company.banks.length > 0 ? (
-                  <div className="space-y-4">
-                    {details.company.banks
-                      .filter((bank) => bank.is_active && !bank.is_deleted)
-                      .map((bank, index) => (
-                        <div
-                          key={bank.id || index}
-                          className="space-y-4 rounded-md bg-[#F5F5F5] p-4"
-                        >
-                          <div>
-                            <Label
-                              htmlFor={`bank-name-${bank.id || index}`}
-                              className="mb-2 block"
-                            >
-                              Bank Name
-                            </Label>
-                            <Input
-                              id={`bank-name-${bank.id || index}`}
-                              value={bank.bank_name || "N/A"}
-                              disabled
-                              className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor={`account-name-${bank.id || index}`}
-                              className="mb-2 block"
-                            >
-                              Account Name
-                            </Label>
-                            <Input
-                              id={`account-name-${bank.id || index}`}
-                              value={bank.account_name || "N/A"}
-                              disabled
-                              className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor={`account-number-${bank.id || index}`}
-                              className="mb-2 block"
-                            >
-                              Account Number
-                            </Label>
-                            <Input
-                              id={`account-number-${bank.id || index}`}
-                              value={bank.account_number || "N/A"}
-                              disabled
-                              className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor={`sort-code-${bank.id || index}`}
-                              className="mb-2 block"
-                            >
-                              Sort Code
-                            </Label>
-                            <Input
-                              id={`sort-code-${bank.id || index}`}
-                              value={bank.sort_code || "N/A"}
-                              disabled
-                              className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm">
-                    No bank details available
-                  </div>
-                )}
+                {(() => {
+                  const companyBank =
+                    details?.company?.bank ??
+                    details?.company?.banks?.find(
+                      (bank) => bank.is_active && !bank.is_deleted
+                    ) ??
+                    details?.company?.banks?.[0];
+
+                  if (!companyBank) {
+                    return (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        No bank details available
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4 rounded-md bg-[#F5F5F5] p-4">
+                      <div>
+                        <Label htmlFor="bank-name" className="mb-2 block">
+                          Bank Name
+                        </Label>
+                        <Input
+                          id="bank-name"
+                          value={companyBank.bank_name || "N/A"}
+                          disabled
+                          className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="account-name" className="mb-2 block">
+                          Account Name
+                        </Label>
+                        <Input
+                          id="account-name"
+                          value={companyBank.account_name || "N/A"}
+                          disabled
+                          className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="account-number" className="mb-2 block">
+                          Account Number
+                        </Label>
+                        <Input
+                          id="account-number"
+                          value={companyBank.account_number || "N/A"}
+                          disabled
+                          className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="sort-code" className="mb-2 block">
+                          Sort Code
+                        </Label>
+                        <Input
+                          id="sort-code"
+                          value={companyBank.sort_code || "N/A"}
+                          disabled
+                          className="w-full bg-[#E4E4E4] text-gray-900 cursor-not-allowed disabled:opacity-100"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>

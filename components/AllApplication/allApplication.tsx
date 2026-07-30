@@ -14,23 +14,14 @@ import Pagination from "@/ui/pagination";
 import TableHeaderComponent from "@/components/TableHeader";
 import { useMultipleTableHeaders } from "@/hooks/useTableHeaderState";
 import { getCompanyList, type TableFilters } from "@/composable/getTableData";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import DateRangePicker from "@/ui/dateRangePicker";
 import { Application } from "./type";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 
 const AllApplicationTable = () => {
-  const router = useRouter();
-
-  // State for table data and pagination
-  const [companies, setCompanies] = useState<Application[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // State for search and filters
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<TableFilters>({});
   const [advancedFilterInputs, setAdvancedFilterInputs] = useState({
@@ -38,68 +29,29 @@ const AllApplicationTable = () => {
     postcode: "",
     businessName: "",
   });
-
-  // State for formatted dates
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
     {}
   );
 
-  // Use multiple table headers hook with unique instance ID
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
-
-  // Get current state for this specific table instance
   const currentState = getInstanceState("all-application-table");
 
-  // Fetch companies data from API
-  const fetchCompanies = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      setIsLoading(true);
-      try {
-        const filters: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
+  const {
+    results: companies,
+    totalItems,
+    isLoading,
+  } = usePaginatedTableQuery<Application>({
+    resource: "all-applications",
+    fetcher: (queryFilters) =>
+      getCompanyList(queryFilters) as Promise<
+        import("@/composable/getTableData").TableDataResult<Application>
+      >,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters,
+  });
 
-        const result = await getCompanyList(filters);
-
-        if (result.success && result.data) {
-          setCompanies(result.data.results as Application[]);
-          setTotalItems(result.data.count);
-        } else {
-          toast.error(result.message || "Failed to fetch companies");
-          // If authentication error, redirect to login
-          if (
-            result.message?.includes("authentication") ||
-            result.message?.includes("token") ||
-            (result.errors &&
-              typeof result.errors === "object" &&
-              "status" in result.errors &&
-              result.errors.status === 401)
-          ) {
-            router.push("/login");
-          }
-          setCompanies([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching companies:", error);
-        toast.error("An error occurred while fetching companies");
-        setCompanies([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage, router]
-  );
-
-  // Format dates for companies
   const formatCompanyDates = useCallback(async (companyList: Application[]) => {
     const datePromises = companyList.map(async (company) => {
       if (company.created_at) {
@@ -129,53 +81,36 @@ const AllApplicationTable = () => {
     }
   }, []);
 
-  // Load initial data
-  useEffect(() => {
-    fetchCompanies(currentPage, searchTerm, filters);
-  }, [fetchCompanies, currentPage, searchTerm, filters]);
-
-  // Format dates when companies change
   useEffect(() => {
     if (companies.length > 0) {
       formatCompanyDates(companies);
     }
   }, [companies, formatCompanyDates]);
 
-  // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  // Handle search change (kept consistent with SubmittedSalesTable)
   const handleSearchChange = (searchValue: string) => {
-    // Update local search term used for API query
     setSearchTerm(searchValue);
-    // Whenever search changes, start again from the first page
     setCurrentPage(1);
   };
 
-  // Handle filter change (kept consistent with SubmittedSalesTable)
   const handleFilterChange = (filterOptions: {
     condition: boolean;
     status: boolean;
   }) => {
-    // Use functional update to avoid stale state issues
     setFilters((previousFilters) => ({
       ...previousFilters,
-      // Backend expects `is_active` flag; we currently only map `status`
       is_active: filterOptions.status,
     }));
-
-    // Reset to the first page whenever filters change so results stay predictable
     setCurrentPage(1);
   };
 
-  // Handle advanced filter input changes
   const handleAdvancedFilterInputChange = (
     field: "mpanMprn" | "postcode" | "businessName",
     value: string
   ) => {
-    // Ensure only numeric data is stored for MPAN/MPRN just like in SubmittedSalesTable
     const sanitizedValue =
       field === "mpanMprn" ? value.replace(/\D/g, "") : value;
 
@@ -185,7 +120,6 @@ const AllApplicationTable = () => {
     }));
   };
 
-  // Apply advanced filters to API filters state
   const handleApplyAdvancedFilters = () => {
     setFilters((prevFilters) => {
       const nextFilters: TableFilters = { ...prevFilters };
@@ -203,7 +137,6 @@ const AllApplicationTable = () => {
     setCurrentPage(1);
   };
 
-  // Clear advanced filters
   const handleClearAdvancedFilters = () => {
     setAdvancedFilterInputs({
       mpanMprn: "",
@@ -225,7 +158,6 @@ const AllApplicationTable = () => {
     setCurrentPage(1);
   };
 
-  // Helper function to build full address
   const buildFullAddress = (company: Application): string => {
     const addressParts = [
       company.current_address_line1,
@@ -237,7 +169,6 @@ const AllApplicationTable = () => {
     return addressParts.join(" ");
   };
 
-  // Helper function to truncate address for display
   const truncateAddress = (address: string, maxLength: number = 50): string => {
     if (address.length <= maxLength) {
       return address;
@@ -375,7 +306,9 @@ const AllApplicationTable = () => {
                   <TableRow key={company.id || idx}>
                     <TableCell>
                       <Link href={`/all-applications/${company.id}`}>
-                        <InfoButton>{company.lead_id.toString()}</InfoButton>
+                        <InfoButton>
+                          {company.id?.split("-")[0] ?? "N/A"}
+                        </InfoButton>
                       </Link>
                     </TableCell>
                     <TableCell>{company.company_name}</TableCell>

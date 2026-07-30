@@ -68,9 +68,7 @@ export async function getTableData<T>(
       ? `${endpoint}?${queryParams.toString()}`
       : endpoint;
 
-    console.log("📋 Fetching table data from:", fullEndpoint);
     const response = await getDropdown(fullEndpoint);
-    console.log("📋 Table data response:", response);
 
     if (!response.success) {
       // Check for authentication errors
@@ -148,12 +146,21 @@ export async function getCompanyList(filters: TableFilters = {}) {
 }
 
 /**
- * Helper function to get invoice list with filters
+ * Helper function to get partner invoice list with filters
  * @param filters - Table filters including pagination, search, etc.
  * @returns Promise<TableDataResult<Invoice>>
  */
 export async function getInvoiceList(filters: TableFilters = {}) {
   return getTableData("/api/v1/auth/web/utility/partner-invoice/", filters);
+}
+
+/**
+ * Helper function to get core commission invoice list with filters
+ * (paginated: `page`, `page_size`, `count`, `next`, `previous`, `results`)
+ * @param filters - Table filters including pagination, search, etc.
+ */
+export async function getCoreInvoiceList<T = unknown>(filters: TableFilters = {}) {
+  return getTableData<T>("/api/v1/auth/web/core/invoice/", filters);
 }
 
 /**

@@ -10,225 +10,164 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useRouteLoading } from "@/contexts/RouteLoadingContext";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useMenu } from "@/contexts/MenuContext";
+import { collectMenuHrefs } from "@/lib/navigation/menuUtils";
+import { useFilteredSidebarMenu } from "@/hooks/useFilteredSidebarMenu";
+import type { MenuNode } from "@/contexts/MenuContext";
 import { branding } from "@/lib/config/branding";
 
-// SVG icon imports
-import DashboardIcon from '../Icons/DashboardIcon';
-import GenerateQuoteIcon from '../Icons/GenerateQuoteIcon';
-import SubmittedSalesIcon from '../Icons/SubmittedSalesIcon';
-import ExportContractIcon from '../Icons/ExportContractIcon';
-import ReportsIcon from '../Icons/ReportsIcon';
-import TicketsIcon from '../Icons/TicketsIcon';
-import DocuSignIcon from '../Icons/DocuSignIcon';
-import TPIDocumentIcon from '../Icons/TPIDocumentIcon';
-import InvoicesIcon from '../Icons/InvoicesIcon';
-import UsersIcon from '../Icons/UsersIcon';
-// import PermissionIcon from '../Icons/PermissionIcon';
-import AllApplicationIcon from '../Icons/AllApplicationIcon';
+import DashboardIcon from "../Icons/DashboardIcon";
+import GenerateQuoteIcon from "../Icons/GenerateQuoteIcon";
+import SubmittedSalesIcon from "../Icons/SubmittedSalesIcon";
+import ExportContractIcon from "../Icons/ExportContractIcon";
+import ReportsIcon from "../Icons/ReportsIcon";
+import TicketsIcon from "../Icons/TicketsIcon";
+import DocuSignIcon from "../Icons/DocuSignIcon";
+import TPIDocumentIcon from "../Icons/TPIDocumentIcon";
+import InvoicesIcon from "../Icons/InvoicesIcon";
+import UsersIcon from "../Icons/UsersIcon";
+import AllApplicationIcon from "../Icons/AllApplicationIcon";
+
+const ACTIVE_COLOR = "var(--primary)";
+const INACTIVE_COLOR = "#737373";
+
+function isPathActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isMenuNodeActive(pathname: string, node: MenuNode): boolean {
+  if (node.href && isPathActive(pathname, node.href)) return true;
+  return node.subItems?.some((child) => isMenuNodeActive(pathname, child)) ?? false;
+}
+
+function renderIcon(id: string, active: boolean): React.ReactNode {
+  const color = active ? ACTIVE_COLOR : INACTIVE_COLOR;
+
+  switch (id) {
+    case "dashboard":
+      return <DashboardIcon color={color} width={24} height={24} />;
+    case "generate-quote":
+      return <GenerateQuoteIcon color={color} width={28} height={28} />;
+    case "submitted-sales":
+      return <SubmittedSalesIcon color={color} width={24} height={24} />;
+    case "export-contract":
+      return <ExportContractIcon color={color} width={22} height={22} />;
+    case "reports":
+      return <ReportsIcon color={color} width={20} height={20} />;
+    case "tickets":
+      return <TicketsIcon color={color} width={34} height={34} />;
+    case "docusign":
+      return <DocuSignIcon color={color} width={22} height={23} />;
+    case "tpi-document":
+      return <TPIDocumentIcon color={color} width={24} height={25} />;
+    case "invoices":
+      return <InvoicesIcon color={color} width={22} height={23} />;
+    case "users":
+      return <UsersIcon color={color} width={28} height={28} />;
+    case "all-applications":
+      return <AllApplicationIcon color={color} width={22} height={22} />;
+    default:
+      return null;
+  }
+}
+
+function mapMenuNodeToItem(
+  node: MenuNode,
+  pathname: string,
+  navigate: (href: string) => void
+): NavigationMenuItemProps {
+  const active = isMenuNodeActive(pathname, node);
+  const subItems = node.subItems?.map((child) => ({
+    label: child.label,
+    active: child.href ? pathname === child.href : false,
+    onClick: child.href ? () => navigate(child.href!) : undefined,
+  }));
+
+  return {
+    icon: renderIcon(node.id, active),
+    label: node.label,
+    active,
+    subItems,
+    onClick: node.href ? () => navigate(node.href!) : undefined,
+  };
+}
 
 export const NavigationMenu = (): JSX.Element => {
   const router = useRouter();
   const pathname = usePathname();
   const { isSidebarCollapsed } = useSidebar();
   const { startRouteLoading } = useRouteLoading();
-  const usersMenu = useMenu();
-  /**
-   * Navigate to a new route and trigger the global route loading state.
-   *
-   * Important detail:
-   * - We **skip** starting the loading state (and calling `router.push`)
-   *   when the target `href` is exactly the current `pathname`.
-   *   Otherwise, the RouteLoadingContext effect (which only listens to
-   *   `pathname` changes) never fires and the app appears to be stuck
-   *   in a loading state for "self-navigation" clicks (e.g. clicking
-   *   "Add Tickets" while already on `/tickets/add-ticket`).
-   */
+  const { menu, isLoaded: isMenuLoaded } = useFilteredSidebarMenu();
+
   const navigate = useCallback(
     (href: string) => {
-      // Avoid redundant navigation and infinite loading when clicking
-      // the currently active menu item.
       if (href === pathname) return;
-
       startRouteLoading();
       router.push(href);
     },
     [router, pathname, startRouteLoading]
   );
-  
-  // Memoize menu items to prevent unnecessary re-renders
-  const menuItems: NavigationMenuItemProps[] = useMemo(() => [
-    {
-      icon: <DashboardIcon color={pathname === "/dashboard" ? "var(--primary)" : "#737373"} width={24} height={24} />,
-      label: "Dashboard",
-      active: pathname === "/dashboard",
-      onClick: () => navigate("/dashboard"),
-    },
-    {
-      icon: <GenerateQuoteIcon color={pathname.startsWith("/generate-quote") ? "var(--primary)" : "#737373"} width={28} height={28} />,
-      label: "Generate Quote",
-      active: pathname.startsWith("/generate-quote"),
-      subItems: [
-        {
-          label: "Electricity Quote",
-          active: pathname === "/generate-quote/electricity-quote",
-          onClick: () => navigate("/generate-quote/electricity-quote"),
-        },
-        {
-          label: "Gas Quote",
-          active: pathname === "/generate-quote/gas-quote",
-          onClick: () => navigate("/generate-quote/gas-quote"),
-        },
-      ],
-    },
-    {
-      icon: <SubmittedSalesIcon color={pathname === "/submitted-sales" ? "var(--primary)" : "#737373"} width={24} height={24} />,
-      label: "Submitted sales",
-      active: pathname === "/submitted-sales",
-      onClick: () => navigate("/submitted-sales"),
-    },
-    {
-      icon: <ExportContractIcon color={pathname === "/export-contract" ? "var(--primary)" : "#737373"} width={22} height={22} />,
-      label: "Export Contract",
-      active: pathname === "/export-contract",
-      onClick: () => navigate("/export-contract"),
-    },
-    {
-      icon: <ReportsIcon color={pathname === "/reports" ? "var(--primary)" : "#737373"} width={20} height={20} />,
-      label: "Reports",
-      active: pathname === "/reports",
-      onClick: () => navigate("/reports"),
-    },
-    {
-      icon: <TicketsIcon color={pathname === "/tickets" ? "var(--primary)" : "#737373"} width={34} height={34} />,
-      label: "Tickets",
-      active: pathname.startsWith("/tickets"),
-      subItems: [
-        {
-          label: "Add Tickets",
-          // Route is `/tickets/add-ticket` (singular). The previous plural path
-          // rendered an empty page because it does not exist.
-          active: pathname === "/tickets/add-ticket",
-          onClick: () => navigate("/tickets/add-ticket"),
-        },
-        {
-          label: "Manage Tickets",
-          active: pathname === "/tickets",
-          onClick: () => navigate("/tickets"),
-        },
-      ],
-    },
-    {
-      icon: <DocuSignIcon color={pathname === "/docusign" ? "var(--primary)" : "#737373"} width={22} height={23} />,
-      label: "DocuSign",
-      active: pathname === "/docusign",
-      onClick: () => navigate("/docusign"),
-    },
-    {
-      icon: <TPIDocumentIcon color={pathname === "/tpi-document" ? "var(--primary)" : "#737373"} width={24} height={25} />,
-      label: "TPI Document",
-      active: pathname === "/tpi-document",
-      onClick: () => navigate("/tpi-document"),
-    },
-    {
-      icon: <InvoicesIcon color={pathname === "/invoices" ? "var(--primary)" : "#737373"} width={22} height={23} />,
-      label: "Invoices",
-      active: pathname === "/invoices",
-      onClick: () => navigate("/invoices"),
-    },
-   
 
-    ...(usersMenu.length > 0
-      ? [{
-          icon: <UsersIcon color={pathname.startsWith("/users") ? "var(--primary)" : "#737373"} width={28} height={28} />,
-          label: "Users",
-          active: pathname.startsWith("/users"),
-          subItems: usersMenu.map((item) => ({
-            label: item.label,
-            active: pathname === item.href,
-            onClick: () => navigate(item.href || "/users/user-list"),
-          })),
-        }]
-      : []),
-    // {
-    //   icon: <PermissionIcon color={pathname === "/permission" ? "var(--primary)" : "#737373"} width={24} height={25} />,
-    //   label: "Permission",
-    //   active: pathname === "/permission",
-    //   onClick: () => router.push("/permission"),
-    // },
-    {
-      icon: <AllApplicationIcon color={pathname === "/all-applications" ? "var(--primary)" : "#737373"} width={22} height={22} />,
-      label: "All Application",
-      active: pathname === "/all-applications",
-      onClick: () => navigate("/all-applications"),
-    },
-  ], [pathname, navigate, usersMenu]);
+  const menuItems = useMemo(
+    () => menu.map((item) => mapMenuNodeToItem(item, pathname, navigate)),
+    [menu, pathname, navigate]
+  );
 
-  // Prefetch routes for faster navigation
   React.useEffect(() => {
-    const routesToPrefetch = [
-      "/dashboard",
-      "/generate-quote/electricity-quote",
-      "/generate-quote/gas-quote",
-      "/submitted-sales",
-      "/export-contract",
-      "/reports",
-      "/tickets",
-      "/docusign",
-      "/tpi-document",
-      "/invoices",
-      "/users/user-list",
-      "/users/role-list",
-      "/users/add-new-role",
-      "/all-applications",
-    ];
-    // router.prefetch exists in next/link; for programmatic, some environments still expose it
+    const routesToPrefetch = collectMenuHrefs(menu);
     type PrefetchCapable = { prefetch?: (href: string) => void };
     const maybePrefetch = (router as unknown as PrefetchCapable).prefetch;
     if (maybePrefetch) {
-      routesToPrefetch.forEach((r) => maybePrefetch(r));
+      routesToPrefetch.forEach((route) => maybePrefetch(route));
     }
-  }, [router]);
+  }, [router, menu]);
 
   return (
-    <div className={`h-full py-0 flex flex-col transition-all duration-300 ease-in-out ${
-      isSidebarCollapsed ? 'w-16' : 'w-48 xl:w-64'
-    }`}>
-      <div className={`flex justify-center py-4 ${isSidebarCollapsed ? 'px-2' : ''}`}>
+    <div
+      className={`h-full py-0 flex flex-col transition-all duration-300 ease-in-out ${
+        isSidebarCollapsed ? "w-16" : "w-48 xl:w-64"
+      }`}
+    >
+      <div className={`flex justify-center py-4 ${isSidebarCollapsed ? "px-2" : ""}`}>
         {isSidebarCollapsed ? (
           <Image
             width={32}
             height={32}
-            className="w-8 h-8 object-cover"
+            className="w-8 h-8 object-contain"
             alt={branding.logoAlt}
             src={branding.logoSrc}
             priority
+            unoptimized
           />
         ) : (
           <Image
             width={139}
             height={52}
-            className="w-[139px] h-[52px] object-cover"
+            className="w-[139px] h-[52px] object-contain"
             alt={branding.logoAlt}
             src={branding.logoSrc}
             priority
+            unoptimized
           />
         )}
       </div>
 
       <ScrollArea className="flex-1 w-full">
-        <div className={`py-2 ${isSidebarCollapsed ? 'px-2' : 'px-1 xl:px-4'}`}>
-          {menuItems.map((item, index) => (
-            <NavigationMenuItem
-              key={`nav-item-${index}`}
-              icon={item.icon}
-              label={item.label}
-              active={item.active}
-              subItems={item.subItems}
-              onClick={item.onClick}
-              isCollapsed={isSidebarCollapsed}
-            />
-          ))}
+        <div className={`py-2 ${isSidebarCollapsed ? "px-2" : "px-1 xl:px-4"}`}>
+          {!isMenuLoaded ? (
+            <div className="px-3 py-4 text-xs text-gray-400">Loading menu...</div>
+          ) : (
+            menuItems.map((item, index) => (
+              <NavigationMenuItem
+                key={`nav-item-${menu[index]?.id ?? index}`}
+                icon={item.icon}
+                label={item.label}
+                active={item.active}
+                subItems={item.subItems}
+                onClick={item.onClick}
+                isCollapsed={isSidebarCollapsed}
+              />
+            ))
+          )}
         </div>
       </ScrollArea>
     </div>

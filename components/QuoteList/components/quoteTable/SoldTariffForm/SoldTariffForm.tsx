@@ -9,6 +9,8 @@ import SoldTariffFormPage2 from "./SoldTariffFormPage2";
 import SoldTariffFormPage3 from "./SoldTariffFormPage3";
 import SoldTariffFormPage4 from "./SoldTariffFormPage4";
 import { postMethod } from "@/lib/actions/postMethod";
+import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
+import { parseTermMonths } from "@/composable/sellApplicationMeterTariff";
 
 // Step titles for the form
 const STEP_TITLES = [
@@ -161,6 +163,14 @@ const SoldTariffForm = () => {
     typeof window !== "undefined"
       ? sessionStorage.getItem("sold_meterstring") || ""
       : "";
+  // Selected quote term from quote list (display string like "12 months")
+  const resolvedTerm =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem("sold_term") || ""
+      : "";
+  const resolvedLatestTerm = resolvedTerm
+    ? parseTermMonths(resolvedTerm)
+    : undefined;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -393,51 +403,50 @@ const SoldTariffForm = () => {
         (form.businessType?.label || "").toLowerCase() === "limited company" ||
         form.businessType?.value === "3" ||
         form.businessType?.value === "limited-company";
+      // Route always provides quoteId (/sold-tariff/[quoteId]); send as FK on company POST
+      const parsedQuoteId =
+        quoteId != null && quoteId.trim() !== ""
+          ? Number.parseInt(quoteId, 10)
+          : Number.NaN;
       const payload = {
         // Required fields with defaults
-        lead_id: 1, // Default value - should be provided from context
-        company_status_id: 1, // Default value - should be provided from context
-        agent_user_id: 1, // Default value - should be provided from context
-        partner_user_id: 1, // Default value - should be provided from context
-        account_manager_user_id: 1, // Default value - should be provided from context
-        created_user_id: 1, // Default value - should be provided from context
-        last_modified_user_id: 1, // Default value - should be provided from context
+        lead_id: 1,
+        company_status_id: 1,
+        agent_user_id: 1,
+        partner_user_id: 1,
+        account_manager_user_id: 1,
+        created_user_id: 1,
+        last_modified_user_id: 1,
         deleted_user_id: null,
-        quote: quoteId || null,
 
-        // Company information from form (with fallbacks)
         company_name:
           form.companyName?.label || form.companyName?.value || "New Company",
+        ...(Number.isFinite(parsedQuoteId) ? { quote: parsedQuoteId } : {}),
         ...(isLimitedCompany && form.regNo && { registration_no: form.regNo }),
         is_micro_business: form.isMicroBusiness || false,
         number_of_employees: form.employees || "",
         estimated_turnover: form.turnover || "",
 
-        // Current address from form (with fallbacks)
         current_address_line1: form.address[0] || "",
         current_address_line2: form.address[1] || "",
         current_address_line3: form.address[2] || "",
         current_address_line4: form.address[3] || "",
         current_postcode: form.postCode || "",
 
-        // Owner/Partner information from form (with fallbacks)
         owner_partner_name: form.ownerPartnerName || "",
         owner_partner_dob: form.ownerPartnerDOB || null,
         owner_partner_dobstring: form.ownerPartnerDOB || "",
 
-        // Home address (from Page 2, independent from Page 1)
         home_address_line1: form.homeAddress[0] || "",
         home_address_line2: form.homeAddress[1] || "",
         home_address_line3: form.homeAddress[2] || "",
         home_address_line4: form.homeAddress[3] || "",
         home_postcode: form.homePostCode || "",
 
-        // Time at current address (with fallback)
         time_at_current_address_months:
-          parseInt(form.timeAtAddressYear || "0") * 12 +
-          parseInt(form.timeAtAddressMonth || "0"),
+          parseInt(form.timeAtAddressYear || "0", 10) * 12 +
+          parseInt(form.timeAtAddressMonth || "0", 10),
 
-        // Previous addresses (using empty defaults)
         previous_address_line1: "",
         previous_address_line2: "",
         previous_address_line3: "",
@@ -451,7 +460,6 @@ const SoldTariffForm = () => {
         previous_postcode2: "",
         time_at_previous_address2_months: 0,
 
-        // Provider information (using empty defaults)
         gas_provider: "",
         gas_renewal_date: null,
         gas_spending_band: "",
@@ -465,12 +473,10 @@ const SoldTariffForm = () => {
         gi_renewal_date: null,
         gi_spending_band: "",
 
-        // Contact information from form (with fallbacks)
         primary_telephone_number: form.telephoneNumber || "",
 
-        // Contract and business information
         contracts_processed: 0,
-        contracts_issold: false,
+        contracts_issold: true,
         contracts_soldleadid: null,
         original_lead_source_campaign_string: "",
         original_lead_source_campaign_id: null,
@@ -480,67 +486,70 @@ const SoldTariffForm = () => {
         has_company_callbacks: false,
         ced: "",
         sold_supplier_name: resolvedSupplierName,
-        // sold_supplier: resolvedSupplierId,
         sold_supplier: null,
+        // Months parsed from selected quote Terms column (e.g. "24 months" → 24)
+        ...(resolvedLatestTerm != null && { latestterm: resolvedLatestTerm }),
         username: "",
         contract_type: contractType,
-        business_type: form.businessType?.value
-          ? parseInt(form.businessType.value)
-          : null,
+        business_type: resolveBusinessTypePk(
+          form.businessType?.value ?? form.businessType
+        ),
 
-        // System fields
         is_active: true,
         is_deleted: false,
         deleted_at: null,
         deleted_datetime: null,
         account_manager_user_name: "",
 
-        // Billing address from form (if different, with fallbacks)
-        ...(form.billingType?.value === "different" &&
-          {
-            // Use billing address if different from current
-          }),
-
-        // Director information from form (optional)
         ...(form.directorFirstName && {
           director_first_name: form.directorFirstName,
         }),
         ...(form.directorLastName && {
           director_last_name: form.directorLastName,
         }),
-
-        // Trading information from form (optional)
         ...(form.timeTradingFor && { time_trading_for: form.timeTradingFor }),
         ...(form.incorporatedDate && {
           incorporated_date: form.incorporatedDate,
         }),
 
-        // Bank details from form (optional)
-        ...(form.accountNumber && { account_number: form.accountNumber }),
-        ...(form.sortCode && { sort_code: form.sortCode }),
-        ...(form.bankName && { bank_name: form.bankName }),
-        ...(form.accountName && { account_name: form.accountName }),
+        bank: {
+          bank_name: form.bankName || "",
+          account_name: form.accountName || "",
+          account_number: form.accountNumber || "",
+          sort_code: form.sortCode || "",
+        },
 
-        // Contact details (optional)
-        ...(form.primaryContactFirstName && {
-          primary_contact_first_name: form.primaryContactFirstName,
-        }),
-        ...(form.primaryContactLastName && {
-          primary_contact_last_name: form.primaryContactLastName,
-        }),
-        ...(form.primaryContactPosition && {
-          primary_contact_position: form.primaryContactPosition,
-        }),
-        ...(form.primaryContactEmail && {
-          primary_contact_email: form.primaryContactEmail,
-        }),
-        ...(form.primaryContactTitle && {
-          primary_contact_title:
-            form.primaryContactTitle?.label || form.primaryContactTitle?.value,
-        }),
-        supplier_name: resolvedSupplierName,
-        latesttariffname: resolvedLatestTariffName,
-        meterstring: resolvedMeterString,
+        primary_contact: {
+          first_name: form.primaryContactFirstName || "",
+          last_name: form.primaryContactLastName || "",
+          position: form.primaryContactPosition || "",
+          email: form.primaryContactEmail || "",
+          title:
+            form.primaryContactTitle?.label ||
+            form.primaryContactTitle?.value ||
+            "",
+          telephone: form.telephoneNumber || "",
+        },
+
+        ...(resolvedMeterString
+          ? {
+              sites: [
+                {
+                  sitename:
+                    form.companyName?.label ||
+                    form.companyName?.value ||
+                    "Main Site",
+                  postcode: form.postCode || "",
+                  address_line_1: form.address[0] || "",
+                  address_line_2: form.address[1] || "",
+                  address_line_3: form.address[2] || "",
+                  address_line_4: form.address[3] || "",
+                  total_employee: Number.parseInt(form.employees || "0", 10) || 0,
+                  meterstrings: [resolvedMeterString],
+                },
+              ],
+            }
+          : {}),
       };
 
       console.log("Mapped payload:", payload);

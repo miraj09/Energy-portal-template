@@ -7,25 +7,24 @@ import { Input } from "@/ui/input";
 // import Image from "next/image";
 import CustomDateInput from "@/ui/customDateInput";
 import { useRouter } from "next/navigation";
-import { postMethod } from "@/lib/actions/postMethod";
 import { useSupplierContext } from "@/contexts/SupplierContext";
 import { toast } from "sonner";
 import {
   createApplicationMeter,
   CreateApplicationMeterPayload,
+  extractMeterIdFromApiResponse,
 } from "@/composable/createApplicationMeter";
 import { updateApplicationMeter } from "@/composable/updateApplicationMeter";
 import { Meter } from "@/components/ApplicationDetails/types";
-import { MeterQuoteFormValues } from "@/composable/meterQuoteForm";
-
-// Interface for the quote header response
-interface QuoteHeaderResponse {
-  id?: string | number;
-  Quote_Header_ID?: string | number;
-  [key: string]: unknown;
-}
-
-// Import supplier types from the hook
+import {
+  buildFlatQuotePayload,
+  MeterQuoteFormValues,
+} from "@/composable/meterQuoteForm";
+import {
+  extractQuoteHeaderId,
+  getQuoteApiErrorMessage,
+  postQuoteHeader,
+} from "@/composable/quoteHeaderApi";
 import { Supplier, SupplierOption } from "@/hooks/useSuppliers";
 
 // Data for MPAN grid with digit limits
@@ -144,10 +143,11 @@ const customSelectStyles: StylesConfig<SupplierOption, false, GroupBase<Supplier
 };
 
 interface QuoteDetailsSectionProps {
-  variant?: "page" | "modal";
+  variant?: "page" | "modal" | "applicationQuote";
   companyId?: string;
   siteId?: number;
   meterId?: number;
+  quoteId?: number;
   defaultPostcode?: string;
   initialQuoteData?: MeterQuoteFormValues | null;
   onSuccess?: (meter?: Meter) => void;
@@ -158,12 +158,15 @@ export const QuoteDetailsSection = ({
   companyId,
   siteId,
   meterId,
+  quoteId,
   defaultPostcode = "",
   initialQuoteData = null,
   onSuccess,
 }: QuoteDetailsSectionProps = {}): JSX.Element => {
   const router = useRouter();
   const isModal = variant === "modal";
+  const isApplicationQuote = variant === "applicationQuote";
+  const isModalLike = isModal || isApplicationQuote;
   const isEditMode = isModal && meterId != null;
 
   // State for MPAN inputs
@@ -199,12 +202,12 @@ export const QuoteDetailsSection = ({
   const { suppliers, supplierOptions, loading: suppliersLoading } = useSupplierContext();
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
-  // Sync postcode when site changes in modal mode
+  // Sync postcode when site changes in modal / application quote mode
   useEffect(() => {
-    if (isModal && defaultPostcode && !initialQuoteData) {
+    if (isModalLike && defaultPostcode && !initialQuoteData) {
       setPostcode(defaultPostcode);
     }
-  }, [isModal, defaultPostcode, initialQuoteData]);
+  }, [isModalLike, defaultPostcode, initialQuoteData]);
 
   // Populate form when editing with fetched meter data
   useEffect(() => {
@@ -423,92 +426,31 @@ export const QuoteDetailsSection = ({
     }
   };
 
-  // Build the payload according to the API specification
+  // Build flat quote-header payload (new API — no Contract_Rates)
   const buildPayload = () => {
-    // Concatenate bottom row values for bottomline
-    const bottomline = mpanBottomValues.slice(1).join(""); // Skip first value (region)
-    
-    // Build contract rates array
-    const contractRates = [];
-    
-    // Rate type 1: Standing charge
-    if (currentStandingCharge) {
-      contractRates.push({
-        rate_type: 1,
-        rate: parseFloat(currentStandingCharge),
-        usage: null
-      });
-    }
-    
-    // Rate type 2: Day rate
-    if (dayRate && dayKwh) {
-      contractRates.push({
-        rate_type: 2,
-        rate: parseFloat(dayRate),
-        usage: parseInt(dayKwh),
-        rate_required: true,
-        usage_required: true
-      });
-    }
-    
-    // Rate type 3: Night rate
-    if (nightRate && nightKwh) {
-      contractRates.push({
-        rate_type: 3,
-        rate: parseFloat(nightRate),
-        usage: parseInt(nightKwh),
-        rate_required: true,
-        usage_required: true
-      });
-    }
-    
-    // Rate type 4: EW rate
-    if (ewRate && ewKwh) {
-      contractRates.push({
-         
-      });
-    }
-    
-    // Rate type 5: Winter rate
-    if (winterRate && winterKwh) {
-      contractRates.push({
-        rate_type: 5,
-        rate: parseFloat(winterRate),
-        usage: parseInt(winterKwh),
-        rate_required: true,
-        usage_required: true
-      });
-    }
+    const bottomline = mpanBottomValues.slice(1).join("");
 
-    // aq_eac = total kWh across rate types 2–5 (Day, Night, EW, Winter)
-    const parseKwhUsage = (value: string) =>
-      value.trim() ? parseInt(value, 10) : 0;
-    const aqEac =
-      parseKwhUsage(dayKwh) +
-      parseKwhUsage(nightKwh) +
-      parseKwhUsage(ewKwh) +
-      parseKwhUsage(winterKwh);
-
-    return {
+    return buildFlatQuotePayload({
+      isGas: false,
       profileclass: mpanTopValues[0],
       MTC: mpanTopValues[1],
       LLF: mpanTopValues[2],
       Region: mpanBottomValues[0],
-      bottomline: bottomline,
+      bottomline,
       postcode: postcode || null,
-      Supplier: selectedSupplier?.id, // Use selected supplier ID or fallback to default
-      Number_of_Days: parseInt(numberOfDays) || 365,
-      PartnerUserID: null,
-      isCOT: false,
-      isRIsk: false,
-      useUplift: true,
-      MeterType: 20, // Default value, you might want to make this dynamic
-      Term: null,
-      Contract_Start_Date: contractStartDate || new Date().toISOString(),
-      Contract_Rates: contractRates,
-      is_mpan: true,
-      aq_eac: aqEac > 0 ? aqEac : null,
-    };
+      supplierId: selectedSupplier?.id,
+      numberOfDays,
+      contractStartDate,
+      currentStandingCharge,
+      dayRate,
+      dayKwh,
+      nightRate,
+      nightKwh,
+      ewRate,
+      ewKwh,
+      winterRate,
+      winterKwh,
+    });
   };
 
   // Validate required fields before submission
@@ -589,13 +531,67 @@ export const QuoteDetailsSection = ({
     const hasErrors = validateRequiredFields();
     
     if (hasErrors) {
-      return; // Return early if validation fails, errors are already displayed below inputs
+      toast.error("Please complete all required fields before continuing.");
+      return;
     }
 
     try {
       setIsSubmitting(true);
       
       const payload = buildPayload();
+
+      // Application quote flow: meter first (auto-creates quote), then patch rates
+      if (isApplicationQuote && companyId && siteId) {
+        const meterResponse = await createApplicationMeter({
+          company_id: companyId,
+          site_id: siteId,
+          meter_type: "Electricity",
+          meter_reference: buildMeterReference(),
+          quote_payload: payload,
+        });
+
+        if (!meterResponse.success) {
+          if (
+            meterResponse.errors &&
+            typeof meterResponse.errors === "object" &&
+            "authError" in meterResponse.errors
+          ) {
+            toast.error("Token expired. Authentication required.");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            router.push("/login");
+          } else {
+            toast.error(
+              meterResponse.message ||
+                "Failed to create meter and quote. Please try again."
+            );
+          }
+          return;
+        }
+
+        const createdMeterId =
+          extractMeterIdFromApiResponse(meterResponse.data) ??
+          meterResponse.data?.meterid ??
+          null;
+        const quoteHeaderId = meterResponse.quoteId ?? null;
+
+        if (!createdMeterId || !quoteHeaderId) {
+          toast.error("Meter created but required IDs were not returned.");
+          return;
+        }
+
+        const params = new URLSearchParams({
+          quoteId: String(quoteHeaderId),
+          companyId,
+          siteId: String(siteId),
+          meterId: String(createdMeterId),
+          source: "application",
+        });
+
+        router.push(
+          `/generate-quote/electricity-quote/quote-list?${params.toString()}`
+        );
+        return;
+      }
 
       // Modal mode: create or update meter for application site
       if (isModal && companyId && siteId && onSuccess) {
@@ -605,6 +601,7 @@ export const QuoteDetailsSection = ({
           meter_type: "Electricity",
           meter_reference: buildMeterReference(),
           quote_payload: payload,
+          quote_id: quoteId,
         };
 
         const response = isEditMode
@@ -630,15 +627,11 @@ export const QuoteDetailsSection = ({
         return;
       }
       
-      const response = await postMethod(
-        payload,
-        "/api/v1/auth/web/core/quote-header/"
-      );
-      
-      if (response.success) {
-        // Extract the Quote_Header_ID from the response
-        const responseData = response.data as QuoteHeaderResponse;
-        const quoteHeaderId = responseData?.id || responseData?.Quote_Header_ID;
+      const quoteResponse = await postQuoteHeader(payload);
+
+      if (quoteResponse.success) {
+        const quoteHeaderId =
+          quoteResponse.quoteId ?? extractQuoteHeaderId(quoteResponse);
         
         if (quoteHeaderId) {
           try {
@@ -669,24 +662,8 @@ export const QuoteDetailsSection = ({
         // Navigate to quote list with the quote ID
         router.push(`electricity-quote/quote-list?quoteId=${quoteHeaderId}`);
       } else {
-        // Show standardized validation error toast if available
-        const errors = response.errors as Record<string, string[] | string> | undefined;
-        if (errors && typeof errors === "object") {
-          // pick first error entry
-          const firstKey = Object.keys(errors)[0];
-          if (firstKey) {
-            const raw = Array.isArray(errors[firstKey]) ? (errors[firstKey] as string[])[0] : String(errors[firstKey]);
-            const message = raw?.startsWith("This field")
-              ? `${firstKey.charAt(0).toUpperCase()}${firstKey.slice(1)}${raw.replace("This field", "")}`.trim()
-              : raw || response.message || "Request failed";
-            toast.error(message.replace(/\.$/, ""));
-          } else {
-            toast.error(response.message || "Request failed");
-          }
-        } else {
-          toast.error(response.message || "Request failed");
-        }
-        console.error("Quote submission failed:", response.message, response.errors);
+        toast.error(getQuoteApiErrorMessage(quoteResponse));
+        console.error("Quote submission failed:", quoteResponse.message, quoteResponse.errors);
       }
     } catch (error) {
       console.error("Error submitting quote:", error);
@@ -708,14 +685,14 @@ export const QuoteDetailsSection = ({
   return (
     <section
       className={
-        isModal
+        isModalLike
           ? "w-full bg-white"
           : "w-full max-w-[1106px] mx-auto my-4 lg:my-8 px-4 lg:px-0 bg-white"
       }
     >
       <Card
         className={
-          isModal
+          isModalLike
             ? "w-full border-0 shadow-none rounded-lg"
             : "w-full shadow-[0px_4px_10px_rgba(0,0,0,0.25)] rounded-lg"
         }
@@ -1137,9 +1114,11 @@ export const QuoteDetailsSection = ({
                 ? "Submitting..."
                 : isEditMode
                   ? "Update Meter"
-                  : isModal
-                    ? "Add Meter"
-                    : "Get Quote"}
+                  : isApplicationQuote
+                    ? "Get Quote"
+                    : isModal
+                      ? "Add Meter"
+                      : "Get Quote"}
             </Button>
           </div>
         </CardContent>

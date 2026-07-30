@@ -110,3 +110,25 @@ export function getRoleDisplayNames(user: UserRecord | null | undefined): string
     .filter((name): name is string => Boolean(name))
     .join(", ");
 }
+
+/**
+ * Returns true when the user has at least one role whose name matches
+ * any of the allowed role names (case-insensitive, exact match after trim).
+ */
+export function userHasAnyRole(
+  user: UserRecord | null | undefined,
+  allowedRoleNames: readonly string[]
+): boolean {
+  if (!user?.role_details?.length || allowedRoleNames.length === 0) {
+    return false;
+  }
+
+  const normalizedAllowedRoles = new Set(
+    allowedRoleNames.map((roleName) => roleName.trim().toLowerCase()).filter(Boolean)
+  );
+
+  return user.role_details.some((role) => {
+    const normalizedRoleName = role.name?.trim().toLowerCase();
+    return Boolean(normalizedRoleName && normalizedAllowedRoles.has(normalizedRoleName));
+  });
+}

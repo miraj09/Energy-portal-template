@@ -1,5 +1,7 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+
+import React, { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Table,
   TableHeader,
@@ -21,15 +23,37 @@ import {
 import { getBottomlineFromCompanyDetail } from "@/composable/getBottomlineFromCompanyDetail";
 import { Company, SubmittedSale } from "@/components/ExportContractTable/type";
 import { formatDateTimeWithSeconds } from "@/composable/getFormatedDate";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import DateRangePicker from "@/ui/dateRangePicker";
 import Link from "next/link";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
+
+/** Lazy-load date picker — pulls react-date-range CSS/JS only when this page mounts. */
+const DateRangePicker = dynamic(() => import("@/ui/dateRangePicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-10 rounded border border-[#A0A0A0] bg-gray-50" />
+  ),
+});
 
 type SubmittedSalesRecord = Omit<SubmittedSale, "company"> & {
   company?: Company | null;
   company_detail?: Company | null;
   quote_mpan_mrpn_text?: string | null;
+};
+
+/** Flat row ready for the table — avoids re-walking nested company_detail on every render. */
+type SubmittedSalesDisplayRow = {
+  id: string | number | null;
+  hrefId: string | number | null;
+  companyIdLabel: string;
+  companyName: string;
+  address: string;
+  fuelType: string;
+  supplierName: string;
+  mpanMprn: string;
+  submittedBy: string;
+  leadStatus: string;
+  submittedDateTime: string;
+  subtitle: string;
 };
 
 const toDisplayString = (value: unknown): string => {
@@ -41,18 +65,75 @@ const toDisplayString = (value: unknown): string => {
   return "N/A";
 };
 
-// API-driven table state
+function mapRecordToDisplayRow(
+  record: SubmittedSalesRecord
+): SubmittedSalesDisplayRow {
+  const companyId = record.company_detail?.id ?? record.company?.id;
+  const companyIdLabel =
+    companyId == null ? "N/A" : (String(companyId).split("-")[0] ?? "N/A");
+
+  const detail = record.company_detail;
+  const address = detail
+    ? [
+        detail.current_address_line1,
+        detail.current_address_line2,
+        detail.current_address_line3,
+        detail.current_address_line4,
+        detail.current_postcode,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+
+  const submittedByRaw =
+    record.submitted_by ?? record.company_detail?.submitted_by ?? null;
+  let submittedBy = "N/A";
+  if (submittedByRaw != null) {
+    if (typeof submittedByRaw === "object" && "name" in submittedByRaw) {
+      submittedBy = toDisplayString(
+        (submittedByRaw as { name?: string | null }).name
+      );
+    } else {
+      submittedBy = toDisplayString(submittedByRaw);
+    }
+  }
+
+  const bottomlineValue = getBottomlineFromCompanyDetail(record.company_detail);
+  const lead = record.lead_id != null ? String(record.lead_id) : "N/A";
+  const ref = record.reference ?? "N/A";
+
+  return {
+    id: record.id ?? null,
+    hrefId: record.id ?? null,
+    companyIdLabel,
+    companyName: record.company_detail?.company_name ?? "",
+    address,
+    fuelType: toDisplayString(record.company_detail?.contract_type),
+    supplierName: toDisplayString(
+      record.company?.sold_supplier_name ??
+        record.company_detail?.sold_supplier_name
+    ),
+    mpanMprn: toDisplayString(
+      bottomlineValue ?? record.company_detail?.quote_mpan_mrpn_text
+    ),
+    submittedBy,
+    leadStatus: toDisplayString(record.lead_status_revised),
+    submittedDateTime: formatDateTimeWithSeconds(
+      record.submitted_datetime ??
+        record.created_at ??
+        record.updated_at ??
+        record.company?.created_at ??
+        null
+    ),
+    subtitle: [lead, ref].filter(Boolean).join(" - "),
+  };
+}
+
 const itemsPerPageDefault = 10;
 
-// Removed mock data - using API data only
-
 const SubmittedSalesTable = () => {
-  const router = useRouter();
-  const [sales, setSales] = useState<SubmittedSalesRecord[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(itemsPerPageDefault);
-  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<TableFilters>({});
   const [advancedFilterInputs, setAdvancedFilterInputs] = useState({
@@ -61,71 +142,37 @@ const SubmittedSalesTable = () => {
     businessName: "",
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] =
-    useState<SubmittedSalesRecord | null>(null);
+  const [selectedSubtitle, setSelectedSubtitle] = useState("");
+  const [selectedCompanyName, setSelectedCompanyName] = useState("");
 
-  // Use multiple table headers hook with unique instance ID
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
-
   const currentState = getInstanceState("submitted-sales-table");
 
-  const fetchSales = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      setIsLoading(true);
-      try {
-        const query: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
-        const result = await getSubmittedSalesList<SubmittedSalesRecord>(query);
-        if (result.success && result.data) {
-          setSales(result.data.results);
-          console.log("Submitted sales:", result.data.results);
-          setTotalItems(result.data.count);
-        } else {
-          toast.error(result.message || "Failed to fetch submitted sales");
-          if (
-            result.message?.includes("authentication") ||
-            result.message?.includes("token") ||
-            (result.errors &&
-              typeof result.errors === "object" &&
-              "status" in (result.errors as Record<string, unknown>) &&
-              (result.errors as { status?: number }).status === 401)
-          ) {
-            router.push("/login");
-          }
-          setSales([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching submitted sales:", error);
-        toast.error("An error occurred while fetching submitted sales");
-        setSales([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage, router]
+  const {
+    results: sales,
+    totalItems,
+    isLoading,
+    isFetching,
+  } = usePaginatedTableQuery<SubmittedSalesRecord>({
+    resource: "submitted-sales",
+    fetcher: getSubmittedSalesList,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters,
+  });
+
+  // Map nested API rows once when results change — not on every keystroke/re-render.
+  const displayRows = useMemo(
+    () => sales.map(mapRecordToDisplayRow),
+    [sales]
   );
 
-  useEffect(() => {
-    fetchSales(currentPage, searchTerm, filters);
-  }, [fetchSales, currentPage, searchTerm, filters]);
-
-  // Handle search with controlled state
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
   };
 
-  // Handle filter changes with controlled state
   const handleFilterChange = (filterOptions: {
     condition: boolean;
     status: boolean;
@@ -152,13 +199,10 @@ const SubmittedSalesTable = () => {
   const handleApplyAdvancedFilters = () => {
     setFilters((prevFilters) => {
       const nextFilters: TableFilters = { ...prevFilters };
-
       const trimmedMpan = advancedFilterInputs.mpanMprn.trim();
       const trimmedPostcode = advancedFilterInputs.postcode.trim();
       const trimmedBusinessName = advancedFilterInputs.businessName.trim();
 
-      // Map UI advanced filters to API query params
-      // NOTE: backend expects `quote_mpan_mrpn_text` (not nested under company)
       nextFilters.quote_mpan_mrpn_text = trimmedMpan || undefined;
       nextFilters.current_postcode = trimmedPostcode || undefined;
       nextFilters.company_name = trimmedBusinessName || undefined;
@@ -189,70 +233,21 @@ const SubmittedSalesTable = () => {
     setCurrentPage(1);
   };
 
-  // Handle info button click
-  // const handleInfoClick = (record: SubmittedSalesRecord) => {
-  //   setSelectedRecord(record);
-  //   setIsModalOpen(true);
-  // };
-
-  // Handle modal close
   const handleModalClose = () => {
     setIsModalOpen(false);
-    setSelectedRecord(null);
-  };
-
-  // Get current state for this specific table instance
-  const getCompanyName = (r: SubmittedSalesRecord): string =>
-    r.company_detail?.company_name ?? "";
-  const getAddress = (r: SubmittedSalesRecord) => {
-    const c = r.company_detail;
-    if (!c) return "";
-    return [
-      c.current_address_line1,
-      c.current_address_line2,
-      c.current_address_line3,
-      c.current_address_line4,
-      c.current_postcode,
-    ].filter(Boolean).join(" ");
-  };
-  const getFuelType = (r: SubmittedSalesRecord) =>
-    toDisplayString(r.company_detail?.contract_type);
-  const getSupplierName = (r: SubmittedSalesRecord): string =>
-    toDisplayString(
-      r.company?.sold_supplier_name ?? r.company_detail?.sold_supplier_name,
-    );
-  const getMpanMprn = (r: SubmittedSalesRecord): string => {
-    const bottomlineValue = getBottomlineFromCompanyDetail(r.company_detail);
-    return toDisplayString(bottomlineValue ?? r.company_detail?.quote_mpan_mrpn_text);
-  };
-  const getSubmittedBy = (r: SubmittedSalesRecord): string =>
-    toDisplayString(r.submitted_by);
-  const getLeadStatus = (r: SubmittedSalesRecord): string =>
-    toDisplayString(r.lead_status_revised);
-  const getSubmittedDateTime = (r: SubmittedSalesRecord) =>
-    formatDateTimeWithSeconds(
-      r.submitted_datetime ??
-        r.created_at ??
-        r.updated_at ??
-        r.company?.created_at ??
-        null
-    );
-  const getSubtitle = (r: SubmittedSalesRecord) => {
-    const lead = r.lead_id != null ? String(r.lead_id) : "N/A";
-    const ref = r.reference ?? "N/A";
-    return [lead, ref].filter(Boolean).join(" - ");
+    setSelectedCompanyName("");
+    setSelectedSubtitle("");
   };
 
   return (
     <section className="w-full mx-auto my-4 lg:my-8 px-6 lg:px-8">
       <TableHeaderComponent
         title="Submitted Sales"
-        onCSVExport={() => console.log("CSV Export clicked")}
-        onExcelExport={() => console.log("Excel Export clicked")}
+        onCSVExport={() => undefined}
+        onExcelExport={() => undefined}
         onSearchChange={handleSearchChange}
         showDateRangePicker={false}
         onFilterChange={handleFilterChange}
-        // Controlled state props with unique instance ID
         searchValue={currentState.searchValue}
         filterByCondition={currentState.filterByCondition}
         filterByStatus={currentState.filterByStatus}
@@ -316,19 +311,19 @@ const SubmittedSalesTable = () => {
                 Date Range
               </label>
               <DateRangePicker
-                onRangeChange={(formattedRange, startDate, endDate) =>
-                  console.log("Date range:", formattedRange, startDate, endDate)
-                }
+                onRangeChange={() => undefined}
               />
             </div>
             <div className="flex flex-col justify-end gap-2 md:flex-row md:items-end md:justify-end md:col-span-2 lg:col-span-4">
               <button
+                type="button"
                 onClick={handleApplyAdvancedFilters}
                 className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
               >
                 Apply Filters
               </button>
               <button
+                type="button"
                 onClick={handleClearAdvancedFilters}
                 className="border border-primary text-primary px-4 py-2 rounded text-sm font-medium hover:bg-primary/10 transition-colors cursor-pointer"
               >
@@ -338,12 +333,15 @@ const SubmittedSalesTable = () => {
           </div>
         </div>
         <CardContent className="p-0">
+          {isFetching && !isLoading ? (
+            <p className="px-6 py-2 text-xs text-gray-500">Updating…</p>
+          ) : null}
           <Table>
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary text-primary-foreground">
-                <TableHead>Notes</TableHead>
+                <TableHead>ID</TableHead>
                 <TableHead>Company Name</TableHead>
-                <TableHead className="w-48">Address</TableHead>
+                <TableHead className="w-72 min-w-72">Address</TableHead>
                 <TableHead>Full Type</TableHead>
                 <TableHead>Supplier Name</TableHead>
                 <TableHead>MPAN/MPRN</TableHead>
@@ -359,35 +357,37 @@ const SubmittedSalesTable = () => {
                     Loading submitted sales...
                   </TableCell>
                 </TableRow>
-              ) : sales.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8">
                     No submitted sales found
                   </TableCell>
                 </TableRow>
               ) : (
-                sales.map((record, idx) => (
-                  <TableRow key={(record.id ?? idx).toString()}>
+                displayRows.map((row, idx) => (
+                  <TableRow key={(row.id ?? idx).toString()}>
                     <TableCell>
-                      <Link href={`/submitted-sales/${record.id}`}>
-                        <InfoButton>
-                          {record.company_detail?.lead_id?.toString() ?? "N/A"}
-                        </InfoButton>
-                      </Link>
+                      {row.hrefId != null ? (
+                        <Link href={`/submitted-sales/${row.hrefId}`}>
+                          <InfoButton>{row.companyIdLabel}</InfoButton>
+                        </Link>
+                      ) : (
+                        row.companyIdLabel
+                      )}
                     </TableCell>
-                    <TableCell>{getCompanyName(record)}</TableCell>
+                    <TableCell>{row.companyName}</TableCell>
                     <TableCell
-                      className="w-48 max-w-48 break-words whitespace-normal py-2"
-                      title={getAddress(record)}
+                      className="w-72 min-w-72 max-w-72 break-words whitespace-normal py-2"
+                      title={row.address}
                     >
-                      {getAddress(record)}
+                      {row.address}
                     </TableCell>
-                    <TableCell>{getFuelType(record)}</TableCell>
-                    <TableCell>{getSupplierName(record)}</TableCell>
-                    <TableCell>{getMpanMprn(record)}</TableCell>
-                    <TableCell>{getSubmittedBy(record)}</TableCell>
-                    <TableCell>{getLeadStatus(record)}</TableCell>
-                    <TableCell>{getSubmittedDateTime(record)}</TableCell>
+                    <TableCell>{row.fuelType}</TableCell>
+                    <TableCell>{row.supplierName}</TableCell>
+                    <TableCell>{row.mpanMprn}</TableCell>
+                    <TableCell>{row.submittedBy}</TableCell>
+                    <TableCell>{row.leadStatus}</TableCell>
+                    <TableCell>{row.submittedDateTime}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -402,12 +402,11 @@ const SubmittedSalesTable = () => {
         />
       </Card>
 
-      {/* Notes and Attachments Modal */}
       <NotesAttachmentsModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
-        companyName={selectedRecord ? getCompanyName(selectedRecord) : ""}
-        subtitle={selectedRecord ? getSubtitle(selectedRecord) : ""}
+        companyName={selectedCompanyName}
+        subtitle={selectedSubtitle}
         attachments={[]}
         notes={[]}
       />

@@ -13,6 +13,7 @@ export const genderOptions: SelectOption[] = [
 export interface Invoice {
   id: string;
   // New API fields for invoice columns
+  latest_invoice_id?: string;
   exported_on_date?: string;
   invoice_number?: string;
   partner_name?: string;
@@ -26,9 +27,25 @@ export interface Invoice {
   // Legacy fields (keeping for backward compatibility)
   order_number?: string;
   company_name?: string;
+  company_id?: string;
+  month?: string;
+  week?: string;
+  agent?: string;
+  vat?: string;
+  reference?: string;
+  notes?: string;
   order_date?: string;
   bill_to?: string;
   total_amount?: string;
+  /** Number of commission line items on this invoice (list API only). */
+  item_count?: number;
+  amount_excluding_vat?: string;
+  vat_amount?: string;
+  amount_including_vat?: string;
+  clawback_amount?: string;
+  final_total?: string;
+  /** When true, `final_total` includes VAT; when false, it excludes VAT. */
+  add_vat?: boolean;
   payment_status?: string;
   created_at?: string;
   updated_at?: string;

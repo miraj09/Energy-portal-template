@@ -8,6 +8,7 @@ import { patchMethod } from "@/lib/actions/patchMethod";
 import { postMethod } from "@/lib/actions/postMethod";
 import { useDeleteApiCall } from "@/composable";
 import { DeleteConfirmationModal } from "@/ui";
+import { getApiErrorMessage } from "@/composable/getApiErrorMessage";
 
 // Define the InfoField interface locally to match DynamicInfoCard
 interface InfoField {
@@ -70,7 +71,7 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
   ): { [key: string]: string } => {
     const errors: { [key: string]: string } = {};
 
-    if (!contact.job_title?.trim()) {
+    if (!contact.job_title?.trim() && !contact.is_primary) {
       errors.job_title = "Job title is required";
     }
     if (!contact.first_name?.trim()) {
@@ -231,19 +232,54 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
     }
 
     try {
-      // Prepare the data to send to API (only specified fields)
+      if (editingContact.is_primary) {
+        const response = await patchMethod(
+          {
+            primary_contact: {
+              first_name: editingContact.first_name,
+              last_name: editingContact.last_name,
+              position: editingContact.job_title || "",
+              email: editingContact.email_address,
+              telephone: editingContact.telephone1,
+              title: "MR",
+            },
+          },
+          `/api/v1/auth/web/core/company/${companyId}/`
+        );
+
+        if (response.success) {
+          const updatedContacts = contacts.map((contact) =>
+            contact.id === editingContact.id ? editingContact : contact
+          );
+
+          setContacts(updatedContacts);
+          setEditingContactId(null);
+          setEditingContact(null);
+          setValidationErrors({});
+          toast.success("Contact updated successfully!");
+        } else if (
+          response.errors &&
+          typeof response.errors === "object" &&
+          "authError" in response.errors
+        ) {
+          toast.error("Authentication failed. Please log in again.");
+        } else {
+          toast.error(getApiErrorMessage(response));
+        }
+        return;
+      }
+
       const contactData = {
         email_address: editingContact.email_address,
         first_name: editingContact.first_name,
-        is_primary: editingContact.is_primary, // Use the actual value from the contact
+        is_primary: editingContact.is_primary,
         job_title: editingContact.job_title,
         last_name: editingContact.last_name,
         telephone1: editingContact.telephone1,
         telephone2: editingContact.telephone2,
-        title: "MR", // Default title as specified
+        title: "MR",
       };
 
-      // Save the contact to the API
       if (editingContact.id && !editingContact.id.startsWith("temp-")) {
         // Update existing contact - PATCH request
         const response = await patchMethod(
@@ -273,7 +309,7 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
           ) {
             toast.error("Authentication failed. Please log in again.");
           } else {
-            throw new Error(response.message || "Failed to update contact");
+            toast.error(getApiErrorMessage(response));
           }
         }
       } else {
@@ -317,7 +353,7 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
           ) {
             toast.error("Authentication failed. Please log in again.");
           } else {
-            throw new Error(response.message || "Failed to create contact");
+            toast.error(getApiErrorMessage(response));
           }
         }
       }
@@ -379,8 +415,41 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
       setIsSaving(true);
 
       try {
-        // Process each contact based on whether it has an ID
-        for (const contact of contacts) {
+        const primaryContact = contacts.find((contact) => contact.is_primary);
+        const secondaryContacts = contacts.filter(
+          (contact) => !contact.is_primary
+        );
+
+        if (primaryContact) {
+          const primaryResponse = await patchMethod(
+            {
+              primary_contact: {
+                first_name: primaryContact.first_name,
+                last_name: primaryContact.last_name,
+                position: primaryContact.job_title || "",
+                email: primaryContact.email_address,
+                telephone: primaryContact.telephone1,
+                title: "MR",
+              },
+            },
+            `/api/v1/auth/web/core/company/${companyId}/`
+          );
+
+          if (!primaryResponse.success) {
+            if (
+              primaryResponse.errors &&
+              typeof primaryResponse.errors === "object" &&
+              "authError" in primaryResponse.errors
+            ) {
+              toast.error("Authentication failed. Please log in again.");
+              return;
+            }
+            toast.error(getApiErrorMessage(primaryResponse));
+            return;
+          }
+        }
+
+        for (const contact of secondaryContacts) {
           // Prepare the data to send to API (only specified fields)
           const contactData = {
             email_address: contact.email_address,
@@ -410,7 +479,8 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
                 toast.error("Authentication failed. Please log in again.");
                 return;
               } else {
-                throw new Error(response.message || "Failed to update contact");
+                toast.error(getApiErrorMessage(response));
+                return;
               }
             }
           } else {
@@ -435,7 +505,8 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
                 toast.error("Authentication failed. Please log in again.");
                 return;
               } else {
-                throw new Error(response.message || "Failed to create contact");
+                toast.error(getApiErrorMessage(response));
+                return;
               }
             }
           }

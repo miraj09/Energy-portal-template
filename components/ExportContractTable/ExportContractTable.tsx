@@ -27,6 +27,7 @@ import { Company, ContactRecord, SubmittedSale } from "./type";
 import { exportReports } from "@/lib/actions/exportReportServer";
 import { CustomSelect, type SelectOption } from "@/ui/select";
 import Link from "next/link";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 
 const ALL_COMPANIES_OPTION: SelectOption = { value: "", label: "All companies" };
 const ALL_LEAD_STATUSES_OPTION: SelectOption = {
@@ -43,11 +44,8 @@ const LEAD_STATUS_OPTIONS: SelectOption[] = [
 
 const ExportContractTable = () => {
   const router = useRouter();
-  const [contracts, setContracts] = useState<ContactRecord[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
-  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<TableFilters>({});
   const [advancedFilterInputs, setAdvancedFilterInputs] = useState({
@@ -78,57 +76,18 @@ const ExportContractTable = () => {
   // Selection state: Set of contact/contract IDs that are currently checked
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Fetch export contracts
-  const fetchContracts = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      setIsLoading(true);
-      try {
-        const query: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
-
-        const result = await getContactsList<ContactRecord>(query);
-
-        if (result.success && result.data) {
-          setContracts(result.data.results);
-          setTotalItems(result.data.count);
-        } else {
-          toast.error(result.message || "Failed to fetch export contracts");
-          if (
-            result.message?.includes("authentication") ||
-            result.message?.includes("token") ||
-            (result.errors &&
-              typeof result.errors === "object" &&
-              "status" in (result.errors as Record<string, unknown>) &&
-              (result.errors as { status?: number }).status === 401)
-          ) {
-            router.push("/login");
-          }
-          setContracts([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching export contracts:", error);
-        toast.error("An error occurred while fetching export contracts");
-        setContracts([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage, router]
-  );
-
-  useEffect(() => {
-    fetchContracts(currentPage, searchTerm, filters);
-  }, [fetchContracts, currentPage, searchTerm, filters]);
+  const {
+    results: contracts,
+    totalItems,
+    isLoading,
+  } = usePaginatedTableQuery<ContactRecord>({
+    resource: "export-contracts",
+    fetcher: getContactsList,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters,
+  });
 
   /** Map API company results to select options (id + company_name). */
   const mapCompaniesToOptions = useCallback(
@@ -388,8 +347,11 @@ const ExportContractTable = () => {
     return c.company?.company_name ?? "N/A";
   };
 
+  // Display company id in the ID column; details still navigate with contact id.
   const getCompanyId = (c: ContactRecord): string => {
-    return toDisplayString(c.company?.id);
+    const companyId = c.company?.id;
+    if (companyId == null) return "N/A";
+    return String(companyId).split("-")[0] ?? "N/A";
   };
 
   const getPostCode = (c: ContactRecord): string => {
@@ -501,6 +463,22 @@ const ExportContractTable = () => {
       c.created_at ??
       null;
     return formatDateTimeWithSeconds(raw);
+  };
+
+  /** Resolve submitter display name from nested `submitted_by` object or legacy scalar. */
+  const getSubmittedBy = (c: ContactRecord): string => {
+    const latest = getLatestSubmittedSale(c);
+    const submittedBy =
+      c.submitted_by ?? latest?.submitted_by ?? null;
+
+    if (submittedBy == null) return "N/A";
+
+    // API returns submitted_by as { id, name, username }
+    if (typeof submittedBy === "object" && "name" in submittedBy) {
+      return toDisplayString(submittedBy.name);
+    }
+
+    return toDisplayString(submittedBy);
   };
 
   // Toggle a single row's selection by id
@@ -818,15 +796,13 @@ const ExportContractTable = () => {
                     <TableCell>
                       {contract.id ? (
                         <Link href={`/export-contract/${contract.id}`}>
-                          <InfoButton>
-                            {contract.id?.split("-")[0] ?? "N/A"}
-                          </InfoButton>
+                          <InfoButton>{getCompanyId(contract)}</InfoButton>
                         </Link>
                       ) : (
-                        (contract.id?.split("-")[0] ?? "N/A")
+                        getCompanyId(contract)
                       )}
                     </TableCell>
-                    <TableCell>{toDisplayString(contract.submitted_by)}</TableCell>
+                    <TableCell>{getSubmittedBy(contract)}</TableCell>
                     {/* <TableCell>{getCompanyId(contract)}</TableCell> */}
                     <TableCell>{getCompanyName(contract)}</TableCell>
                     <TableCell

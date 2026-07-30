@@ -10,7 +10,6 @@ import {
 import { Button } from "@/ui/button";
 import { QuoteDetailsSection as ElectricityQuoteDetails } from "@/components/ElectricityQuote/components/QuoteDetails/quoteDetails";
 import { QuoteDetailsSection as GasQuoteDetails } from "@/components/GasQuote/components/QuoteDetails/quoteDetails";
-import { Meter } from "../types";
 
 type MeterType = "Electricity" | "Gas";
 
@@ -21,7 +20,6 @@ interface AddMeterModalProps {
   siteId: number;
   siteName: string;
   sitePostcode: string;
-  onMeterAdded: (meter: Meter) => void;
 }
 
 const METER_TYPE_OPTIONS: { value: MeterType; label: string }[] = [
@@ -36,7 +34,6 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
   siteId,
   siteName,
   sitePostcode,
-  onMeterAdded,
 }) => {
   const [selectedType, setSelectedType] = useState<MeterType | null>(null);
 
@@ -50,12 +47,6 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
   const handleClose = () => {
     setSelectedType(null);
     onClose();
-  };
-
-  const handleMeterCreated = (meter?: Meter) => {
-    if (!meter) return;
-    onMeterAdded(meter);
-    handleClose();
   };
 
   return (
@@ -106,19 +97,17 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
 
             {selectedType === "Electricity" ? (
               <ElectricityQuoteDetails
-                variant="modal"
+                variant="applicationQuote"
                 companyId={companyId}
                 siteId={siteId}
                 defaultPostcode={sitePostcode}
-                onSuccess={handleMeterCreated}
               />
             ) : (
               <GasQuoteDetails
-                variant="modal"
+                variant="applicationQuote"
                 companyId={companyId}
                 siteId={siteId}
                 defaultPostcode={sitePostcode}
-                onSuccess={handleMeterCreated}
               />
             )}
           </div>

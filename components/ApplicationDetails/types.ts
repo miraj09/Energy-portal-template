@@ -12,6 +12,9 @@ export interface QuoteDetails {
 export interface ContractRates {
   standingCharge: string;
   dayRate: string;
+  nightRate?: string;
+  eveningWeekendRate?: string;
+  winterRate?: string;
 }
 
 export interface ContractDetails {
@@ -116,9 +119,47 @@ export interface CompanyDetails {
   registration_no: string;
 }
 
+export interface PrimaryContactDetails {
+  id: string;
+  first_name: string;
+  last_name: string;
+  position: string | null;
+  email: string;
+  title: string | null;
+  telephone: string;
+}
+
+/** Flat quote fields nested under sites[].meters[].quote */
+export interface QuoteHeaderFlat {
+  id: number;
+  profileclass?: string | null;
+  MTC?: string | null;
+  LLF?: string | null;
+  Region?: string | null;
+  bottomline?: string | null;
+  mpan_mrpn_text?: string | null;
+  is_mpan?: boolean;
+  is_mrpn?: boolean;
+  Number_of_Days?: number | null;
+  standing_charge?: string | null;
+  day_rate?: string | null;
+  day_kwh?: string | null;
+  night_rate?: string | null;
+  night_kwh?: string | null;
+  ew_rate?: string | null;
+  ew_kwh?: string | null;
+  winter_rate?: string | null;
+  winter_kwh?: string | null;
+  aq_eac?: string | null;
+}
+
+export interface SiteMeter extends Meter {
+  quote?: QuoteHeaderFlat | null;
+}
+
 export interface Site {
   id: number;
-  meters: Meter[];
+  meters: SiteMeter[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -225,7 +266,11 @@ export interface UpdateHistory {
 export interface CompanyApiResponse {
   id: string;
   notes: ApiNote[];
-  banks: BankDetails[];
+  /** New API: single bank object */
+  bank?: BankDetails | null;
+  /** Legacy fallback */
+  banks?: BankDetails[];
+  primary_contact?: PrimaryContactDetails | null;
   sites: Site[];
   contacts: ContactDetails[];
   callbacks: Callback[];
@@ -306,7 +351,7 @@ export interface CompanyApiResponse {
   contract_type: string | null;
   created_by: number;
   deleted_by: number | null;
-  business_type: number;
+  business_type: number | { id: number; title?: string; name?: string } | null;
   business_type_name?: string;
   // Optional DocuSign envelope identifier if an e-sign envelope already exists
   loa_envelope_id?: string | null;

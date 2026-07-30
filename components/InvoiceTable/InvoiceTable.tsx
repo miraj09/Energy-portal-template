@@ -14,14 +14,21 @@ import { Card, CardContent } from "@/ui/card";
 import Pagination from "@/ui/pagination";
 import TableHeaderComponent from "@/components/TableHeader";
 import { useMultipleTableHeaders } from "@/hooks/useTableHeaderState";
-import { getGroupedInvoices } from "@/lib/auth";
 import { handleAuthError } from "@/lib/auth";
+import {
+  COMMISSION_MONTH_OPTIONS,
+  COMMISSION_WEEK_OPTIONS,
+  INVOICE_FILTER_SELECT_CLASSNAME,
+  formatCurrencyValue,
+  mapInvoiceApiRowToTableInvoice,
+  type InvoiceApiRow,
+} from "@/composable/invoiceDisplay";
+import { getCoreInvoiceList, type TableFilters } from "@/composable/getTableData";
+import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 import { postMethod } from "@/lib/actions/postMethod";
 import { formatDate } from "@/composable/getFormatedDate";
 import { toast } from "sonner";
 import { Invoice } from "@/lib/types";
-import { type TableFilters } from "@/composable/getTableData";
-import DateRangePicker from "@/ui/dateRangePicker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
@@ -31,90 +38,35 @@ import { Button } from "@/ui/button";
 import { CustomSelect, type SelectOption } from "@/ui/select";
 import { getDropdown } from "@/lib/actions/getDropdown";
 import { getBottomlineFromCompanyDetail } from "@/composable/getBottomlineFromCompanyDetail";
+import {
+  buildInvoiceCreatePayload,
+  COMMISSION_AGENT_PCT,
+  COMMISSION_MONTH_API_OPTIONS,
+  COMMISSION_OFFICE_PCT,
+  COMMISSION_VAT_PCT,
+  COMMISSION_WEEK_API_OPTIONS,
+  computeCommissionLineAmounts,
+  computeInvoiceSummary,
+  createCommissionSectionState,
+  createInvoiceFormState,
+  getCurrentCommissionYear,
+  INVOICE_CREATE_ENDPOINT,
+  type CommissionMonthApiValue,
+  type CommissionSectionState,
+  type CommissionWeekApiValue,
+  type InvoiceFormState,
+} from "@/composable/invoiceCreateApi";
+import type { UserRecord } from "@/lib/types/user";
+import { userHasAnyRole } from "@/lib/user/mapLoginUserData";
 
-/** Single invoice nested under a grouped list row from `invoice-grouped`. */
-interface GroupedInvoiceNestedRecord {
-  id?: string;
-  invoice_datetime?: string;
-  is_minus?: boolean;
-}
+const USER_STORAGE_KEY = "energy_user_Data";
 
-interface GroupedInvoiceApiRecord {
-  company_id: string;
-  company_name?: string;
-  latest_invoice_datetime?: string;
-  invoice_count?: number;
-  sum_total?: string;
-  is_minus?: boolean;
-  invoices?: GroupedInvoiceNestedRecord[];
-}
+/** Super Admin / Admin only: invoice list filters and Add Commission. */
+const INVOICE_ADMIN_ROLES = ["Super Admin", "Admin"] as const;
 
-/** Normalizes API boolean values (boolean, 0/1, or string). */
-const parseIsMinusFlag = (value: unknown): boolean => {
-  if (value === true || value === 1) return true;
-  if (value === false || value === 0 || value === null || value === undefined) {
-    return false;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    return normalized === "true" || normalized === "1" || normalized === "yes";
-  }
-  return false;
-};
-
-const readIsMinusFromRecord = (record: Record<string, unknown>): boolean | undefined => {
-  if ("is_minus" in record) return parseIsMinusFlag(record.is_minus);
-  if ("Is_minus" in record) return parseIsMinusFlag(record.Is_minus);
-  return undefined;
-};
-
-/** Resolves `is_minus` from the grouped row or any nested `invoices` item. */
-const resolveIsMinusFromGroupedRecord = (
-  groupedInvoice: GroupedInvoiceApiRecord
-): boolean => {
-  const topLevelIsMinus = readIsMinusFromRecord(
-    groupedInvoice as unknown as Record<string, unknown>
-  );
-  if (topLevelIsMinus !== undefined) {
-    return topLevelIsMinus;
-  }
-
-  const nestedInvoices = groupedInvoice.invoices;
-  if (!Array.isArray(nestedInvoices) || nestedInvoices.length === 0) {
-    return false;
-  }
-
-  return nestedInvoices.some(
-    (invoice) =>
-      readIsMinusFromRecord(invoice as unknown as Record<string, unknown>) === true
-  );
-};
-
-/** Unwraps paginated list payloads that may be single- or double-nested under `data`. */
-const resolvePaginatedListPayload = (
-  payload: unknown
-): { results: GroupedInvoiceApiRecord[]; count: number } => {
-  const emptyPayload = { results: [] as GroupedInvoiceApiRecord[], count: 0 };
-
-  if (!payload || typeof payload !== "object") {
-    return emptyPayload;
-  }
-
-  const payloadRecord = payload as Record<string, unknown>;
-  const nestedPayload =
-    payloadRecord.data &&
-    typeof payloadRecord.data === "object" &&
-    !Array.isArray(payloadRecord.data)
-      ? (payloadRecord.data as Record<string, unknown>)
-      : payloadRecord;
-
-  const results = Array.isArray(nestedPayload.results)
-    ? (nestedPayload.results as GroupedInvoiceApiRecord[])
-    : [];
-  const count =
-    typeof nestedPayload.count === "number" ? nestedPayload.count : results.length;
-
-  return { results, count };
+const ALL_COMPANIES_OPTION: SelectOption = {
+  value: "",
+  label: "All companies",
 };
 
 interface AgentApiRecord {
@@ -125,147 +77,23 @@ interface AgentApiRecord {
 interface CompanyApiRecord {
   id?: number | string;
   company_name?: string;
-  /** Company list API nests MPAN bottomline under sites → meters → mpan_mrpn_details. */
+  /**
+   * Company list may expose a root meter summary when nested `sites` are omitted.
+   * Used as a fallback for the MPAN/MPRN select label.
+   */
+  meterstring?: string | null;
+  /** Nested path: sites → meters → mpan_mrpn_details.bottomline (when present). */
   sites?: unknown;
   company_detail?: unknown;
+  /** Flat invoice-style embed: mpan_mrpn_details.bottomline. */
+  mpan_mrpn_details?: { bottomline?: string | null } | null;
 }
-
-/** One row for POST /api/v1/auth/web/core/invoice-multiple-add/ (array body). */
-interface InvoiceMultipleAddApiItem {
-  company_id: string;
-  user_id: number;
-  is_active: boolean;
-  invoice_datetime: string;
-  total_received: string;
-  office: string;
-  agent: string;
-  vat: string;
-  total: string;
-  reference: string;
-  notes: string;
-  Is_there_any_clawback_from_previous_week: boolean;
-  clawback_amount: string;
-  is_minus: boolean;
-  month: string;
-  year: number;
-  week: string;
-}
-
-/** API enum values for commission invoice period (`invoice-multiple-add`). */
-type CommissionMonthApiValue =
-  | "JANUARY"
-  | "FEBRUARY"
-  | "MARCH"
-  | "APRIL"
-  | "MAY"
-  | "JUNE"
-  | "JULY"
-  | "AUGUST"
-  | "SEPTEMBER"
-  | "OCTOBER"
-  | "NOVEMBER"
-  | "DECEMBER";
-
-type CommissionWeekApiValue = "WEEK_1" | "WEEK_2" | "WEEK_3" | "WEEK_4";
-
-const COMMISSION_MONTH_API_VALUES: CommissionMonthApiValue[] = [
-  "JANUARY",
-  "FEBRUARY",
-  "MARCH",
-  "APRIL",
-  "MAY",
-  "JUNE",
-  "JULY",
-  "AUGUST",
-  "SEPTEMBER",
-  "OCTOBER",
-  "NOVEMBER",
-  "DECEMBER",
-];
-
-const COMMISSION_MONTH_OPTIONS: { value: CommissionMonthApiValue; label: string }[] = [
-  { value: "JANUARY", label: "January" },
-  { value: "FEBRUARY", label: "February" },
-  { value: "MARCH", label: "March" },
-  { value: "APRIL", label: "April" },
-  { value: "MAY", label: "May" },
-  { value: "JUNE", label: "June" },
-  { value: "JULY", label: "July" },
-  { value: "AUGUST", label: "August" },
-  { value: "SEPTEMBER", label: "September" },
-  { value: "OCTOBER", label: "October" },
-  { value: "NOVEMBER", label: "November" },
-  { value: "DECEMBER", label: "December" },
-];
-
-const COMMISSION_WEEK_OPTIONS: { value: CommissionWeekApiValue; label: string }[] = [
-  { value: "WEEK_1", label: "Week 1" },
-  { value: "WEEK_2", label: "Week 2" },
-  { value: "WEEK_3", label: "Week 3" },
-  { value: "WEEK_4", label: "Week 4" },
-];
 
 const COMMISSION_PERIOD_SELECT_CLASSNAME =
   "block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary";
 
-const getCurrentCommissionMonthValue = (): CommissionMonthApiValue =>
-  COMMISSION_MONTH_API_VALUES[new Date().getMonth()];
-
-const getCurrentCommissionWeekValue = (): CommissionWeekApiValue => {
-  const weekIndex = Math.min(Math.ceil(new Date().getDate() / 7), 4) - 1;
-  return COMMISSION_WEEK_OPTIONS[weekIndex].value;
-};
-
-const getCurrentCommissionYear = (): number => new Date().getFullYear();
-
-const INVOICE_MULTIPLE_ADD_ENDPOINT = "/api/v1/auth/web/core/invoice-multiple-add/";
-
-/** Monetary fields are sent as decimal strings to match the core invoice API. */
-function formatAmountForInvoiceApi(amount: number): string {
-  if (!Number.isFinite(amount)) {
-    return "0.00";
-  }
-  return amount.toFixed(2);
-}
-
-interface CommissionSectionState {
-  sectionId: string;
-  selectedAgentOption: SelectOption | null;
-  selectedMpanMprnOption: SelectOption | null;
-  totalReceived: string;
-  reference: string;
-  notes: string;
-  includeVatInTotal: boolean;
-  /** When true, `clawbackAmount` reduces the commission total and submitted invoice total. */
-  hasPreviousWeekClawback: boolean;
-  clawbackAmount: string;
-  /** When true, amounts are treated as a negative calculation (`is_minus` on the API). */
-  isMinus: boolean;
-  selectedMonth: CommissionMonthApiValue;
-  selectedWeek: CommissionWeekApiValue;
-}
-
-/** Fixed split of `total_received`: office 15%, agent 85%. VAT applies to agent amount. */
-const COMMISSION_OFFICE_PCT = 15;
-const COMMISSION_AGENT_PCT = 85;
-const COMMISSION_VAT_PCT = 20;
 const COMMISSION_DROPDOWN_PAGE_SIZE = 20;
 const COMMISSION_DROPDOWN_SEARCH_DEBOUNCE_MS = 500;
-
-const createCommissionSectionState = (): CommissionSectionState => ({
-  sectionId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  selectedAgentOption: null,
-  selectedMpanMprnOption: null,
-  totalReceived: "",
-  reference: "",
-  notes: "",
-  includeVatInTotal: true,
-  hasPreviousWeekClawback: false,
-  clawbackAmount: "",
-  isMinus: false,
-  selectedMonth: getCurrentCommissionMonthValue(),
-  selectedWeek: getCurrentCommissionWeekValue(),
-});
 
 const formatMoneyGb = (value: number): string =>
   value.toLocaleString("en-GB", {
@@ -274,26 +102,28 @@ const formatMoneyGb = (value: number): string =>
   });
 
 const InvoiceTable = () => {
-  console.log("🏢 InvoiceTable component rendered");
-
   // State for table data and pagination
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
-  const [isLoading, setIsLoading] = useState(false);
 
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<TableFilters>({});
-  const [advancedFilterInputs, setAdvancedFilterInputs] = useState({
-    mpanMprn: "",
-    postcode: "",
-    businessName: "",
-  });
+  const [companyFilterOptions, setCompanyFilterOptions] = useState<SelectOption[]>([
+    ALL_COMPANIES_OPTION,
+  ]);
+  const [isCompanyFilterOptionsLoading, setIsCompanyFilterOptionsLoading] = useState(false);
+  const [companyFilterSearchTerm, setCompanyFilterSearchTerm] = useState("");
+  const [selectedCompanyFilterOption, setSelectedCompanyFilterOption] =
+    useState<SelectOption>(ALL_COMPANIES_OPTION);
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState("");
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState("");
+  const [mpanMprnFilter, setMpanMprnFilter] = useState("");
+  const [postcodeFilter, setPostcodeFilter] = useState("");
   const [commissionSections, setCommissionSections] = useState<CommissionSectionState[]>([
     createCommissionSectionState(),
   ]);
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceFormState>(createInvoiceFormState);
   const [isCommissionSectionVisible, setIsCommissionSectionVisible] = useState(false);
   const [agentOptions, setAgentOptions] = useState<SelectOption[]>([]);
   const [isAgentOptionsLoading, setIsAgentOptionsLoading] = useState(false);
@@ -307,12 +137,30 @@ const InvoiceTable = () => {
   const [hasMoreMpanMprnOptions, setHasMoreMpanMprnOptions] = useState(false);
   const agentSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const mpanMprnSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const companyFilterSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [isSubmittingCommissionInvoices, setIsSubmittingCommissionInvoices] = useState(false);
+  // Default false until localStorage is read (avoids flashing admin UI for other roles).
+  const [isInvoiceAdmin, setIsInvoiceAdmin] = useState(false);
 
   // State for formatted dates
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
     {}
   );
+
+  useEffect(() => {
+    try {
+      const rawUserData = localStorage.getItem(USER_STORAGE_KEY);
+      if (!rawUserData) {
+        setIsInvoiceAdmin(false);
+        return;
+      }
+      const parsedUser = JSON.parse(rawUserData) as UserRecord;
+      setIsInvoiceAdmin(userHasAnyRole(parsedUser, INVOICE_ADMIN_ROLES));
+    } catch (error) {
+      console.error("Failed to read energy_user_Data for invoice admin access:", error);
+      setIsInvoiceAdmin(false);
+    }
+  }, []);
 
   // Use multiple table headers hook with unique instance ID
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
@@ -320,76 +168,25 @@ const InvoiceTable = () => {
   // Get current state for this specific table instance
   const currentState = getInstanceState("invoice-table");
 
-  const mapGroupedInvoiceToTableInvoice = (
-    groupedInvoice: GroupedInvoiceApiRecord
-  ): Invoice => {
-    return {
-      // Use company_id as row identifier so details page can load all invoices for a company.
-      id: groupedInvoice.company_id,
-      exported_on_date: groupedInvoice.latest_invoice_datetime,
-      invoice_number: groupedInvoice.company_id,
-      company_name: groupedInvoice.company_name,
-      contract_count: groupedInvoice.invoice_count,
-      net_payment_due: groupedInvoice.sum_total,
-      is_minus: resolveIsMinusFromGroupedRecord(groupedInvoice),
-    };
-  };
+  const {
+    results: invoiceApiRows,
+    totalItems,
+    isLoading,
+    refetch: refetchInvoices,
+  } = usePaginatedTableQuery<InvoiceApiRow>({
+    resource: "invoices",
+    fetcher: getCoreInvoiceList,
+    page: currentPage,
+    pageSize: itemsPerPage,
+    search: searchTerm,
+    filters,
+  });
 
-  // Fetch invoices data from API
-  const fetchInvoices = useCallback(
-    async (
-      page: number = 1,
-      search: string = "",
-      additionalFilters: TableFilters = {}
-    ) => {
-      console.log("🔄 fetchInvoices called with:", { page, search, additionalFilters });
-      setIsLoading(true);
-      try {
-        const filters: TableFilters = {
-          page,
-          page_size: itemsPerPage,
-          search,
-          ...additionalFilters,
-        };
-
-        // Convert TableFilters to Record<string, string> for URLSearchParams
-        const stringFilters: Record<string, string> = {};
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            stringFilters[key] = String(value);
-          }
-        });
-
-        const result = await getGroupedInvoices(stringFilters);
-        console.log(result, "result");
-
-        if (result.success && result.data) {
-          const { results, count } = resolvePaginatedListPayload(result.data);
-          const mappedInvoices = results.map(mapGroupedInvoiceToTableInvoice);
-          setInvoices(mappedInvoices);
-          setTotalItems(count);
-        } else {
-          toast.error(result.message || "Failed to fetch invoices");
-          
-          // Handle auth errors
-          if (handleAuthError(result)) {
-            return;
-          }
-          setInvoices([]);
-          setTotalItems(0);
-        }
-      } catch (error) {
-        console.error("Error fetching invoices:", error);
-        toast.error("An error occurred while fetching invoices");
-        setInvoices([]);
-        setTotalItems(0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [itemsPerPage]
+  const invoices = useMemo(
+    () => invoiceApiRows.map(mapInvoiceApiRowToTableInvoice),
+    [invoiceApiRows]
   );
-console.log(invoices, "inv")
+
   const parseAmount = useCallback((value: string): number => {
     const normalizedValue = value.trim();
     if (!normalizedValue) return 0;
@@ -414,10 +211,15 @@ console.log(invoices, "inv")
   );
 
   const handleAddMoreCommissionSection = useCallback(() => {
-    setCommissionSections((previousSections) => [
-      ...previousSections,
-      createCommissionSectionState(),
-    ]);
+    setCommissionSections((previousSections) => {
+      const firstSection = previousSections[0];
+      const nextSection = {
+        ...createCommissionSectionState(),
+        selectedAgentOption: firstSection?.selectedAgentOption ?? null,
+        selectedMpanMprnOption: firstSection?.selectedMpanMprnOption ?? null,
+      };
+      return [...previousSections, nextSection];
+    });
   }, []);
 
   const handleRemoveCommissionSection = useCallback((sectionId: string) => {
@@ -453,11 +255,6 @@ console.log(invoices, "inv")
       console.error("Error formatting dates:", error);
     }
   }, []);
-
-  // Load initial data
-  useEffect(() => {
-    fetchInvoices(currentPage, searchTerm, filters);
-  }, [fetchInvoices, currentPage, searchTerm, filters]);
 
   // Format dates when invoices change
   useEffect(() => {
@@ -497,46 +294,101 @@ console.log(invoices, "inv")
     console.log("Applied filters:", newFilters);
   };
 
-  const handleAdvancedFilterInputChange = (
-    field: "mpanMprn" | "postcode" | "businessName",
-    value: string
-  ) => {
-    const sanitizedValue =
-      field === "mpanMprn" ? value.replace(/\D/g, "") : value;
-    setAdvancedFilterInputs((prev) => ({
-      ...prev,
-      [field]: sanitizedValue,
-    }));
-  };
+  const fetchCompanyFilterOptions = useCallback(async (search: string) => {
+    try {
+      setIsCompanyFilterOptionsLoading(true);
+      const queryParams = new URLSearchParams({
+        page: "1",
+        page_size: "20",
+      });
+      if (search.trim()) {
+        queryParams.set("search", search.trim());
+      }
+      const response = await getDropdown(
+        `/api/v1/auth/web/core/company/?${queryParams.toString()}`
+      );
+      if (!response.success) {
+        toast.error(response.message || "Failed to load company filters.");
+        setCompanyFilterOptions([ALL_COMPANIES_OPTION]);
+        return;
+      }
+      const responseRecord = (response.data ?? {}) as { results?: CompanyApiRecord[] };
+      const companyResults = Array.isArray(responseRecord.results)
+        ? responseRecord.results
+        : [];
+      const mappedCompanyOptions = companyResults
+        .filter(
+          (companyRecord) =>
+            companyRecord.id != null &&
+            (companyRecord.company_name ?? "").trim().length > 0
+        )
+        .map((companyRecord) => ({
+          value: String(companyRecord.id),
+          label: String(companyRecord.company_name).trim(),
+        }));
+      setCompanyFilterOptions([ALL_COMPANIES_OPTION, ...mappedCompanyOptions]);
+    } catch (error) {
+      console.error("Error loading company filter options:", error);
+      toast.error("An error occurred while loading company filters.");
+      setCompanyFilterOptions([ALL_COMPANIES_OPTION]);
+    } finally {
+      setIsCompanyFilterOptionsLoading(false);
+    }
+  }, []);
 
-  const handleApplyAdvancedFilters = () => {
+  useEffect(() => {
+    if (!isInvoiceAdmin) {
+      return;
+    }
+    if (companyFilterSearchDebounceRef.current) {
+      clearTimeout(companyFilterSearchDebounceRef.current);
+    }
+    companyFilterSearchDebounceRef.current = setTimeout(() => {
+      void fetchCompanyFilterOptions(companyFilterSearchTerm);
+    }, COMMISSION_DROPDOWN_SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (companyFilterSearchDebounceRef.current) {
+        clearTimeout(companyFilterSearchDebounceRef.current);
+      }
+    };
+  }, [isInvoiceAdmin, companyFilterSearchTerm, fetchCompanyFilterOptions]);
+
+  const handleApplyInvoiceFilters = () => {
+    const trimmedMpanMprn = mpanMprnFilter.trim();
+    const trimmedPostcode = postcodeFilter.trim();
+
     setFilters((prev) => ({
       ...prev,
-      mpan_mprn: advancedFilterInputs.mpanMprn.trim() || undefined,
-      company__current_postcode:
-        advancedFilterInputs.postcode.trim() || undefined,
-      company__company_name:
-        advancedFilterInputs.businessName.trim() || undefined,
+      company_id: selectedCompanyFilterOption.value || undefined,
+      month: selectedMonthFilter || undefined,
+      week: selectedWeekFilter || undefined,
+      quote_mpan_mrpn_text: trimmedMpanMprn || undefined,
+      current_postcode: trimmedPostcode || undefined,
     }));
     setCurrentPage(1);
   };
 
-  const handleClearAdvancedFilters = () => {
-    setAdvancedFilterInputs({
-      mpanMprn: "",
-      postcode: "",
-      businessName: "",
-    });
+  const handleClearInvoiceFilters = () => {
+    setSelectedCompanyFilterOption(ALL_COMPANIES_OPTION);
+    setSelectedMonthFilter("");
+    setSelectedWeekFilter("");
+    setMpanMprnFilter("");
+    setPostcodeFilter("");
+    setCompanyFilterSearchTerm("");
     setFilters((prev) => {
       const {
-        mpan_mprn,
-        company__current_postcode,
-        company__company_name,
+        company_id,
+        month,
+        week,
+        quote_mpan_mrpn_text,
+        current_postcode,
         ...rest
       } = prev;
-      void mpan_mprn;
-      void company__current_postcode;
-      void company__company_name;
+      void company_id;
+      void month;
+      void week;
+      void quote_mpan_mrpn_text;
+      void current_postcode;
       return rest;
     });
     setCurrentPage(1);
@@ -555,16 +407,6 @@ console.log(invoices, "inv")
     handleFilterChange(filters);
   };
 
-  const handleDownload = (invoice: Invoice) => {
-    if (invoice.invoice_url) {
-      window.open(invoice.invoice_url, "_blank");
-    } else {
-      // Grouped API rows do not return a single file URL.
-      toast.error("Download is available inside invoice details.");
-      console.warn("Invoice download URL not available:", invoice);
-    }
-  };
-
   const fetchAgentOptions = useCallback(
     async ({
       page,
@@ -575,69 +417,69 @@ console.log(invoices, "inv")
       search: string;
       append: boolean;
     }) => {
-    try {
-      setIsAgentOptionsLoading(true);
-      const queryParams = new URLSearchParams({
-        page: String(page),
-        page_size: String(COMMISSION_DROPDOWN_PAGE_SIZE),
-      });
-      if (search.trim()) {
-        queryParams.set("search", search.trim());
-      }
-      const response = await getDropdown(`/api/v1/auth/web/user/?${queryParams.toString()}`);
-      if (!response.success) {
-        toast.error(response.message || "Failed to load agents.");
+      try {
+        setIsAgentOptionsLoading(true);
+        const queryParams = new URLSearchParams({
+          page: String(page),
+          page_size: String(COMMISSION_DROPDOWN_PAGE_SIZE),
+        });
+        if (search.trim()) {
+          queryParams.set("search", search.trim());
+        }
+        const response = await getDropdown(`/api/v1/auth/web/user/?${queryParams.toString()}`);
+        if (!response.success) {
+          toast.error(response.message || "Failed to load agents.");
+          if (!append) {
+            setAgentOptions([]);
+          }
+          setHasMoreAgentOptions(false);
+          return;
+        }
+
+        const responseRecord = (response.data ?? {}) as {
+          results?: AgentApiRecord[];
+          next?: string | null;
+        };
+        const userResults = Array.isArray(responseRecord.results) ? responseRecord.results : [];
+        const mappedAgentOptions = userResults
+          .filter(
+            (agentRecord) =>
+              agentRecord.id != null && (agentRecord.name ?? "").trim().length > 0
+          )
+          .map((agentRecord) => ({
+            value: String(agentRecord.id),
+            label: String(agentRecord.name).trim(),
+          }));
+
+        setAgentOptions((previousOptions) => {
+          if (!append) return mappedAgentOptions;
+          const existingOptionValues = new Set(previousOptions.map((option) => option.value));
+          return [
+            ...previousOptions,
+            ...mappedAgentOptions.filter(
+              (option) => !existingOptionValues.has(option.value)
+            ),
+          ];
+        });
+        setAgentCurrentPage(page);
+        setHasMoreAgentOptions(Boolean(responseRecord.next));
+      } catch (error) {
+        console.error("Error loading agent options:", error);
+        toast.error("An error occurred while loading agents.");
         if (!append) {
           setAgentOptions([]);
         }
         setHasMoreAgentOptions(false);
-        return;
+      } finally {
+        setIsAgentOptionsLoading(false);
       }
-
-      const responseRecord = (response.data ?? {}) as {
-        results?: AgentApiRecord[];
-        next?: string | null;
-      };
-      const userResults = Array.isArray(responseRecord.results) ? responseRecord.results : [];
-      const mappedAgentOptions = userResults
-        .filter(
-          (agentRecord) =>
-            agentRecord.id != null && (agentRecord.name ?? "").trim().length > 0
-        )
-        .map((agentRecord) => ({
-          value: String(agentRecord.id),
-          label: String(agentRecord.name).trim(),
-        }));
-
-      setAgentOptions((previousOptions) => {
-        if (!append) return mappedAgentOptions;
-        const existingOptionValues = new Set(previousOptions.map((option) => option.value));
-        return [
-          ...previousOptions,
-          ...mappedAgentOptions.filter(
-            (option) => !existingOptionValues.has(option.value)
-          ),
-        ];
-      });
-      setAgentCurrentPage(page);
-      setHasMoreAgentOptions(Boolean(responseRecord.next));
-    } catch (error) {
-      console.error("Error loading agent options:", error);
-      toast.error("An error occurred while loading agents.");
-      if (!append) {
-        setAgentOptions([]);
-      }
-      setHasMoreAgentOptions(false);
-    } finally {
-      setIsAgentOptionsLoading(false);
-    }
     },
     []
   );
 
   /**
-   * Commission MPAN/MPRN dropdown label: `sites[].meters[].mpan_mrpn_details.bottomline`
-   * from the company list API (not `mpan_mrpn_text`).
+   * Commission MPAN/MPRN dropdown label uses meter bottomline when available
+   * (`sites[].meters[]`, flat `mpan_mrpn_details`, or root `meterstring`), then company name.
    */
   const resolveCompanyBottomlineDisplayValue = (
     companyRecord: CompanyApiRecord
@@ -658,78 +500,78 @@ console.log(invoices, "inv")
       search: string;
       append: boolean;
     }) => {
-    try {
-      setIsMpanMprnOptionsLoading(true);
-      const queryParams = new URLSearchParams({
-        page: String(page),
-        page_size: String(COMMISSION_DROPDOWN_PAGE_SIZE),
-      });
-      if (search.trim()) {
-        queryParams.set("company_name", search.trim());
-      }
-      const response = await getDropdown(
-        `/api/v1/auth/web/core/company/?${queryParams.toString()}`
-      );
-      if (!response.success) {
-        toast.error(response.message || "Failed to load MPAN/MPRN list.");
+      try {
+        setIsMpanMprnOptionsLoading(true);
+        const queryParams = new URLSearchParams({
+          page: String(page),
+          page_size: String(COMMISSION_DROPDOWN_PAGE_SIZE),
+        });
+        if (search.trim()) {
+          queryParams.set("search", search.trim());
+        }
+        const response = await getDropdown(
+          `/api/v1/auth/web/core/company/?${queryParams.toString()}`
+        );
+        if (!response.success) {
+          toast.error(response.message || "Failed to load MPAN/MPRN list.");
+          if (!append) {
+            setMpanMprnOptions([]);
+          }
+          setHasMoreMpanMprnOptions(false);
+          return;
+        }
+
+        const responseRecord = (response.data ?? {}) as {
+          results?: CompanyApiRecord[];
+          next?: string | null;
+        };
+        const companyResults = Array.isArray(responseRecord.results)
+          ? responseRecord.results
+          : [];
+
+        const mappedMpanMprnOptions: SelectOption[] = [];
+        const seenCompanyIds = new Set<string>();
+        companyResults.forEach((companyRecord) => {
+          if (companyRecord.id == null) {
+            return;
+          }
+          const companyId = String(companyRecord.id).trim();
+          if (!companyId || seenCompanyIds.has(companyId)) {
+            return;
+          }
+          seenCompanyIds.add(companyId);
+          const mpanMprnValue = resolveCompanyBottomlineDisplayValue(companyRecord);
+          const companyName = (companyRecord.company_name ?? "").trim();
+          const labelParts = [mpanMprnValue, companyName].filter((part) => part.length > 0);
+          mappedMpanMprnOptions.push({
+            // Value must be company UUID/id for invoice create `company_id` on each item.
+            value: companyId,
+            label: labelParts.length > 0 ? labelParts.join(" - ") : companyId,
+          });
+        });
+
+        setMpanMprnOptions((previousOptions) => {
+          if (!append) return mappedMpanMprnOptions;
+          const existingOptionValues = new Set(previousOptions.map((option) => option.value));
+          return [
+            ...previousOptions,
+            ...mappedMpanMprnOptions.filter(
+              (option) => !existingOptionValues.has(option.value)
+            ),
+          ];
+        });
+        setMpanMprnCurrentPage(page);
+        setHasMoreMpanMprnOptions(Boolean(responseRecord.next));
+      } catch (error) {
+        console.error("Error loading MPAN/MPRN options:", error);
+        toast.error("An error occurred while loading MPAN/MPRN list.");
         if (!append) {
           setMpanMprnOptions([]);
         }
         setHasMoreMpanMprnOptions(false);
-        return;
+      } finally {
+        setIsMpanMprnOptionsLoading(false);
       }
-
-      const responseRecord = (response.data ?? {}) as {
-        results?: CompanyApiRecord[];
-        next?: string | null;
-      };
-      const companyResults = Array.isArray(responseRecord.results)
-        ? responseRecord.results
-        : [];
-
-      const mappedMpanMprnOptions: SelectOption[] = [];
-      const seenCompanyIds = new Set<string>();
-      companyResults.forEach((companyRecord) => {
-        if (companyRecord.id == null) {
-          return;
-        }
-        const companyId = String(companyRecord.id).trim();
-        if (!companyId || seenCompanyIds.has(companyId)) {
-          return;
-        }
-        seenCompanyIds.add(companyId);
-        const mpanMprnValue = resolveCompanyBottomlineDisplayValue(companyRecord);
-        const companyName = (companyRecord.company_name ?? "").trim();
-        const labelParts = [mpanMprnValue, companyName].filter((part) => part.length > 0);
-        mappedMpanMprnOptions.push({
-          // Value must be company UUID/id for invoice-multiple-add `company_id`.
-          value: companyId,
-          label: labelParts.length > 0 ? labelParts.join(" - ") : companyId,
-        });
-      });
-
-      setMpanMprnOptions((previousOptions) => {
-        if (!append) return mappedMpanMprnOptions;
-        const existingOptionValues = new Set(previousOptions.map((option) => option.value));
-        return [
-          ...previousOptions,
-          ...mappedMpanMprnOptions.filter(
-            (option) => !existingOptionValues.has(option.value)
-          ),
-        ];
-      });
-      setMpanMprnCurrentPage(page);
-      setHasMoreMpanMprnOptions(Boolean(responseRecord.next));
-    } catch (error) {
-      console.error("Error loading MPAN/MPRN options:", error);
-      toast.error("An error occurred while loading MPAN/MPRN list.");
-      if (!append) {
-        setMpanMprnOptions([]);
-      }
-      setHasMoreMpanMprnOptions(false);
-    } finally {
-      setIsMpanMprnOptionsLoading(false);
-    }
     },
     []
   );
@@ -840,11 +682,33 @@ console.log(invoices, "inv")
     return Array.from(optionsByValue.values());
   }, [commissionSections, mpanMprnOptions]);
 
+  const invoiceSummary = useMemo(
+    () => computeInvoiceSummary(commissionSections, invoiceForm, parseAmount),
+    [commissionSections, invoiceForm, parseAmount]
+  );
+
   /**
-   * Builds one API row per commission section (same office/agent/VAT split as the UI)
-   * and POSTs the array to `invoice-multiple-add`.
+   * Builds one nested invoice payload (commission rows in `items[]`)
+   * and POSTs to `/api/v1/auth/web/core/invoice/`.
    */
   const handleSubmitCommissionInvoices = useCallback(async () => {
+    if (!isInvoiceAdmin) {
+      toast.error("Only Super Admin and Admin can create commission invoices.");
+      return;
+    }
+
+    if (invoiceForm.hasPreviousWeekClawback) {
+      const clawbackText = invoiceForm.clawbackAmount.trim();
+      if (!clawbackText) {
+        toast.error("Enter a clawback amount.");
+        return;
+      }
+      if (!Number.isFinite(Number(clawbackText))) {
+        toast.error("Enter a valid clawback amount.");
+        return;
+      }
+    }
+
     for (let sectionIndex = 0; sectionIndex < commissionSections.length; sectionIndex++) {
       const commissionSection = commissionSections[sectionIndex];
       if (!commissionSection.selectedAgentOption?.value) {
@@ -860,7 +724,6 @@ console.log(invoices, "inv")
         toast.error(`Commission #${sectionIndex + 1}: enter a total received amount.`);
         return;
       }
-      const totalReceivedAmount = parseAmount(commissionSection.totalReceived);
       if (!Number.isFinite(Number(totalReceivedText))) {
         toast.error(
           `Commission #${sectionIndex + 1}: enter a valid total received amount.`
@@ -877,105 +740,72 @@ console.log(invoices, "inv")
       }
     }
 
-    const requestPayload: InvoiceMultipleAddApiItem[] = commissionSections.map(
-      (commissionSection) => {
-        const totalReceivedAmount = parseAmount(commissionSection.totalReceived);
-        const officeAmount = totalReceivedAmount * (COMMISSION_OFFICE_PCT / 100);
-        const agentAmount = totalReceivedAmount * (COMMISSION_AGENT_PCT / 100);
-        const vatAmount = agentAmount * (COMMISSION_VAT_PCT / 100);
-        const grossInvoiceTotalAmount =
-          officeAmount +
-          agentAmount +
-          (commissionSection.includeVatInTotal ? vatAmount : 0);
-        const clawbackAmountValue = commissionSection.hasPreviousWeekClawback
-          ? parseAmount(commissionSection.clawbackAmount)
-          : 0;
-        const invoiceTotalAmount = grossInvoiceTotalAmount - clawbackAmountValue;
-
-        const agentIdString = commissionSection.selectedAgentOption!.value.trim();
-        const parsedUserId = Number.parseInt(agentIdString, 10);
-        const companyId = commissionSection.selectedMpanMprnOption!.value.trim();
-
-        return {
-          company_id: companyId,
-          user_id: Number.isFinite(parsedUserId) ? parsedUserId : 0,
-          is_active: true,
-          invoice_datetime: new Date().toISOString(),
-          total_received: formatAmountForInvoiceApi(totalReceivedAmount),
-          office: formatAmountForInvoiceApi(officeAmount),
-          agent: formatAmountForInvoiceApi(agentAmount),
-          vat: formatAmountForInvoiceApi(vatAmount),
-          total: formatAmountForInvoiceApi(invoiceTotalAmount),
-          reference: commissionSection.reference.trim(),
-          notes: commissionSection.notes.trim(),
-          Is_there_any_clawback_from_previous_week:
-            commissionSection.hasPreviousWeekClawback,
-          clawback_amount: formatAmountForInvoiceApi(clawbackAmountValue),
-          is_minus: commissionSection.isMinus,
-          month: commissionSection.selectedMonth,
-          year: getCurrentCommissionYear(),
-          week: commissionSection.selectedWeek,
-        };
-      }
+    const requestPayload = buildInvoiceCreatePayload(
+      invoiceForm,
+      commissionSections,
+      parseAmount
     );
 
     setIsSubmittingCommissionInvoices(true);
     try {
-      const result = await postMethod(requestPayload, INVOICE_MULTIPLE_ADD_ENDPOINT);
+      const result = await postMethod(requestPayload, INVOICE_CREATE_ENDPOINT);
       if (result.success) {
-        toast.success(result.message || "Invoices created successfully.");
+        toast.success(result.message || "Invoice created successfully.");
         setCommissionSections([createCommissionSectionState()]);
-        void fetchInvoices(currentPage, searchTerm, filters);
+        setInvoiceForm(createInvoiceFormState());
+        void refetchInvoices();
       } else {
-        toast.error(result.message || "Failed to create invoices.");
+        toast.error(result.message || "Failed to create invoice.");
         if (handleAuthError(result)) {
           return;
         }
       }
     } catch (error) {
-      console.error("invoice-multiple-add failed:", error);
-      toast.error("An error occurred while creating invoices.");
+      console.error("invoice create failed:", error);
+      toast.error("An error occurred while creating the invoice.");
     } finally {
       setIsSubmittingCommissionInvoices(false);
     }
   }, [
     commissionSections,
-    currentPage,
-    fetchInvoices,
-    filters,
+    refetchInvoices,
+    invoiceForm,
+    isInvoiceAdmin,
     parseAmount,
-    searchTerm,
   ]);
 
   return (
     <section className="w-full mx-auto my-4 lg:my-8 px-6 lg:px-8">
-      <div className="mb-4 flex justify-end">
-        <Button
-          type="button"
-          onClick={() => setIsCommissionSectionVisible((previousValue) => !previousValue)}
-        >
-          {isCommissionSectionVisible ? "Hide Commission" : "Add Commission"}
-        </Button>
-      </div>
+      {isInvoiceAdmin ? (
+        <>
+          <div className="mb-4 flex justify-end">
+            <Button
+              type="button"
+              onClick={() =>
+                setIsCommissionSectionVisible((previousValue) => !previousValue)
+              }
+            >
+              {isCommissionSectionVisible ? "Hide Commission" : "Add Commission"}
+            </Button>
+          </div>
 
-      {isCommissionSectionVisible ? (
+          {isCommissionSectionVisible ? (
         <Card className="mb-4">
           <CardContent className="pt-6">
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900">Commission Calculation</h2>
+
               {commissionSections.map((commissionSection, sectionIndex) => {
                 const sectionBaseAmount = parseAmount(commissionSection.totalReceived);
-                const sectionOfficeAmount = sectionBaseAmount * (COMMISSION_OFFICE_PCT / 100);
-                const sectionAgentAmount = sectionBaseAmount * (COMMISSION_AGENT_PCT / 100);
-                const sectionVatAmount = sectionAgentAmount * (COMMISSION_VAT_PCT / 100);
-                const sectionCommissionGrossTotal =
-                  sectionAgentAmount +
-                  (commissionSection.includeVatInTotal ? sectionVatAmount : 0);
-                const sectionClawbackAmount = commissionSection.hasPreviousWeekClawback
-                  ? parseAmount(commissionSection.clawbackAmount)
-                  : 0;
-                const sectionCommissionTotal =
-                  sectionCommissionGrossTotal - sectionClawbackAmount;
+                const {
+                  officeAmount: sectionOfficeAmount,
+                  agentAmount: sectionAgentAmount,
+                  vatAmount: sectionVatAmount,
+                  lineTotal: sectionCommissionTotal,
+                } = computeCommissionLineAmounts(
+                  sectionBaseAmount,
+                  invoiceForm.addVat
+                );
                 const fieldKeySuffix = `${commissionSection.sectionId}-${sectionIndex}`;
 
                 return (
@@ -1157,133 +987,80 @@ console.log(invoices, "inv")
                           id={`invoice-page-commission-vat-hint-${fieldKeySuffix}`}
                           className="text-xs text-muted-foreground"
                         >
-                          {COMMISSION_VAT_PCT}% of agent amount (applied when included in total)
+                          {COMMISSION_VAT_PCT}% of agent amount; invoice VAT is recalculated
+                          after clawback
                         </p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor={`invoice-page-reference-${fieldKeySuffix}`}>Reference</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl">
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor={`invoice-page-commission-year-${fieldKeySuffix}`}>
+                          Year
+                        </Label>
                         <Input
-                          id={`invoice-page-reference-${fieldKeySuffix}`}
-                          value={commissionSection.reference}
-                          onChange={(event) =>
-                            updateCommissionSection(commissionSection.sectionId, (previousSection) => ({
-                              ...previousSection,
-                              reference: event.target.value,
-                            }))
-                          }
-                          placeholder="Enter invoice reference"
+                          id={`invoice-page-commission-year-${fieldKeySuffix}`}
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={String(getCurrentCommissionYear())}
+                          className="w-full min-w-0"
                         />
-                        <div className="grid grid-cols-3 gap-2 max-w-sm">
-                          <div className="space-y-2 min-w-0">
-                            <Label htmlFor={`invoice-page-commission-year-${fieldKeySuffix}`}>
-                              Year
-                            </Label>
-                            <Input
-                              id={`invoice-page-commission-year-${fieldKeySuffix}`}
-                              type="text"
-                              readOnly
-                              tabIndex={-1}
-                              value={String(getCurrentCommissionYear())}
-                              className="w-full min-w-0"
-                            />
-                          </div>
-                          <div className="space-y-2 min-w-0">
-                            <Label htmlFor={`invoice-page-commission-month-${fieldKeySuffix}`}>
-                              Month
-                            </Label>
-                            <select
-                              id={`invoice-page-commission-month-${fieldKeySuffix}`}
-                              value={commissionSection.selectedMonth}
-                              onChange={(event) =>
-                                updateCommissionSection(
-                                  commissionSection.sectionId,
-                                  (previousSection) => ({
-                                    ...previousSection,
-                                    selectedMonth: event.target.value as CommissionMonthApiValue,
-                                  })
-                                )
-                              }
-                              className={`${COMMISSION_PERIOD_SELECT_CLASSNAME} w-full min-w-0`}
-                            >
-                              {COMMISSION_MONTH_OPTIONS.map((monthOption) => (
-                                <option key={monthOption.value} value={monthOption.value}>
-                                  {monthOption.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="space-y-2 min-w-0">
-                            <Label htmlFor={`invoice-page-commission-week-${fieldKeySuffix}`}>
-                              Week
-                            </Label>
-                            <select
-                              id={`invoice-page-commission-week-${fieldKeySuffix}`}
-                              value={commissionSection.selectedWeek}
-                              onChange={(event) =>
-                                updateCommissionSection(
-                                  commissionSection.sectionId,
-                                  (previousSection) => ({
-                                    ...previousSection,
-                                    selectedWeek: event.target.value as CommissionWeekApiValue,
-                                  })
-                                )
-                              }
-                              className={`${COMMISSION_PERIOD_SELECT_CLASSNAME} w-full min-w-0`}
-                            >
-                              {COMMISSION_WEEK_OPTIONS.map((weekOption) => (
-                                <option key={weekOption.value} value={weekOption.value}>
-                                  {weekOption.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`invoice-page-notes-${fieldKeySuffix}`}>Notes</Label>
-                        <Textarea
-                          id={`invoice-page-notes-${fieldKeySuffix}`}
-                          value={commissionSection.notes}
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor={`invoice-page-commission-month-${fieldKeySuffix}`}>
+                          Month
+                        </Label>
+                        <select
+                          id={`invoice-page-commission-month-${fieldKeySuffix}`}
+                          value={commissionSection.selectedMonth}
                           onChange={(event) =>
-                            updateCommissionSection(commissionSection.sectionId, (previousSection) => ({
-                              ...previousSection,
-                              notes: event.target.value,
-                            }))
+                            updateCommissionSection(
+                              commissionSection.sectionId,
+                              (previousSection) => ({
+                                ...previousSection,
+                                selectedMonth: event.target.value as CommissionMonthApiValue,
+                              })
+                            )
                           }
-                          placeholder="Enter invoice notes"
-                          className="min-h-[96px]"
-                        />
+                          className={`${COMMISSION_PERIOD_SELECT_CLASSNAME} w-full min-w-0`}
+                        >
+                          {COMMISSION_MONTH_API_OPTIONS.map((monthOption) => (
+                            <option key={monthOption.value} value={monthOption.value}>
+                              {monthOption.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor={`invoice-page-commission-week-${fieldKeySuffix}`}>
+                          Week
+                        </Label>
+                        <select
+                          id={`invoice-page-commission-week-${fieldKeySuffix}`}
+                          value={commissionSection.selectedWeek}
+                          onChange={(event) =>
+                            updateCommissionSection(
+                              commissionSection.sectionId,
+                              (previousSection) => ({
+                                ...previousSection,
+                                selectedWeek: event.target.value as CommissionWeekApiValue,
+                              })
+                            )
+                          }
+                          className={`${COMMISSION_PERIOD_SELECT_CLASSNAME} w-full min-w-0`}
+                        >
+                          {COMMISSION_WEEK_API_OPTIONS.map((weekOption) => (
+                            <option key={weekOption.value} value={weekOption.value}>
+                              {weekOption.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-900">
                         Total commission calculation
                       </p>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id={`invoice-page-include-vat-in-total-${fieldKeySuffix}`}
-                            checked={commissionSection.includeVatInTotal}
-                            onCheckedChange={(nextCheckedValue) =>
-                              updateCommissionSection(
-                                commissionSection.sectionId,
-                                (previousSection) => ({
-                                  ...previousSection,
-                                  includeVatInTotal: nextCheckedValue,
-                                })
-                              )
-                            }
-                          />
-                          <Label
-                            htmlFor={`invoice-page-include-vat-in-total-${fieldKeySuffix}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Include VAT in total
-                          </Label>
-                        </div>
-                      </div>
                       <div
                         className="mt-2 rounded-xl border border-border bg-primary-soft px-4 py-3 shadow-sm"
                         role="status"
@@ -1319,70 +1096,155 @@ console.log(invoices, "inv")
                             Is negative calculation
                           </Label>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id={`invoice-page-previous-week-clawback-${fieldKeySuffix}`}
-                            checked={commissionSection.hasPreviousWeekClawback}
-                            onCheckedChange={(nextCheckedState) =>
-                              updateCommissionSection(
-                                commissionSection.sectionId,
-                                (previousSection) => ({
-                                  ...previousSection,
-                                  hasPreviousWeekClawback: nextCheckedState === true,
-                                })
-                              )
-                            }
-                          />
-                          <Label
-                            htmlFor={`invoice-page-previous-week-clawback-${fieldKeySuffix}`}
-                            className="text-sm font-normal cursor-pointer leading-snug"
-                          >
-                            Is there any clawback from previous week?
-                          </Label>
-                        </div>
-                        {commissionSection.hasPreviousWeekClawback ? (
-                          <div className="space-y-2 max-w-md">
-                            <Label htmlFor={`invoice-page-clawback-amount-${fieldKeySuffix}`}>
-                              Clawback amount
-                            </Label>
-                            <Input
-                              id={`invoice-page-clawback-amount-${fieldKeySuffix}`}
-                              inputMode="decimal"
-                              type="number"
-                              step="0.01"
-                              min={0}
-                              value={commissionSection.clawbackAmount}
-                              onChange={(event) =>
-                                updateCommissionSection(
-                                  commissionSection.sectionId,
-                                  (previousSection) => ({
-                                    ...previousSection,
-                                    clawbackAmount: event.target.value,
-                                  })
-                                )
-                              }
-                              aria-describedby={`invoice-page-clawback-amount-hint-${fieldKeySuffix}`}
-                            />
-                            <p
-                              id={`invoice-page-clawback-amount-hint-${fieldKeySuffix}`}
-                              className="text-xs text-muted-foreground"
-                            >
-                              Subtracts from commission total. Amount (£).
-                            </p>
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   </div>
                 );
               })}
+
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold text-gray-700">Invoice details</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice-page-reference">Reference</Label>
+                    <Input
+                      id="invoice-page-reference"
+                      value={invoiceForm.reference}
+                      onChange={(event) =>
+                        setInvoiceForm((previousForm) => ({
+                          ...previousForm,
+                          reference: event.target.value,
+                        }))
+                      }
+                      placeholder="Enter invoice reference"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice-page-notes">Notes</Label>
+                    <Textarea
+                      id="invoice-page-notes"
+                      value={invoiceForm.notes}
+                      onChange={(event) =>
+                        setInvoiceForm((previousForm) => ({
+                          ...previousForm,
+                          notes: event.target.value,
+                        }))
+                      }
+                      placeholder="Enter invoice notes"
+                      className="min-h-[96px]"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="invoice-page-previous-week-clawback"
+                      checked={invoiceForm.hasPreviousWeekClawback}
+                      onCheckedChange={(nextCheckedState) =>
+                        setInvoiceForm((previousForm) => ({
+                          ...previousForm,
+                          hasPreviousWeekClawback: nextCheckedState === true,
+                        }))
+                      }
+                    />
+                    <Label
+                      htmlFor="invoice-page-previous-week-clawback"
+                      className="text-sm font-normal cursor-pointer leading-snug"
+                    >
+                      Is there any clawback from previous week?
+                    </Label>
+                  </div>
+                  {invoiceForm.hasPreviousWeekClawback ? (
+                    <div className="space-y-2 max-w-md">
+                      <Label htmlFor="invoice-page-clawback-amount">Clawback amount</Label>
+                      <Input
+                        id="invoice-page-clawback-amount"
+                        inputMode="decimal"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={invoiceForm.clawbackAmount}
+                        onChange={(event) =>
+                          setInvoiceForm((previousForm) => ({
+                            ...previousForm,
+                            clawbackAmount: event.target.value,
+                          }))
+                        }
+                        aria-describedby="invoice-page-clawback-amount-hint"
+                      />
+                      <p
+                        id="invoice-page-clawback-amount-hint"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Applied at invoice level. Amount (£).
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="invoice-page-include-vat-in-total"
+                      checked={invoiceForm.addVat}
+                      onCheckedChange={(nextCheckedValue) =>
+                        setInvoiceForm((previousForm) => ({
+                          ...previousForm,
+                          addVat: nextCheckedValue,
+                        }))
+                      }
+                    />
+                    <Label
+                      htmlFor="invoice-page-include-vat-in-total"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Include VAT in total
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              
+              <div
+                className="rounded-lg border border-border bg-muted/30 p-4"
+                role="status"
+                aria-live="polite"
+                aria-label="Invoice summary"
+              >
+                <p className="text-sm font-semibold text-gray-900">Invoice summary</p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      Amount excl. VAT
+                    </p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-gray-800">
+                      {formatMoneyGb(invoiceSummary.lineSubtotal)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      Clawback
+                    </p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-gray-800">
+                      {formatMoneyGb(invoiceSummary.clawbackAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      {invoiceForm.addVat
+                        ? "Net total (VAT after clawback)"
+                        : "Net total (excl. VAT)"}
+                    </p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-gray-800">
+                      {formatMoneyGb(invoiceSummary.netTotal)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   disabled={isSubmittingCommissionInvoices}
                   onClick={() => void handleSubmitCommissionInvoices()}
                 >
-                  {isSubmittingCommissionInvoices ? "Submitting…" : "Create invoices"}
+                  {isSubmittingCommissionInvoices ? "Submitting…" : "Create invoice"}
                 </Button>
                 <Button type="button" variant="outline" onClick={handleAddMoreCommissionSection}>
                   Add More
@@ -1391,6 +1253,8 @@ console.log(invoices, "inv")
             </div>
           </CardContent>
         </Card>
+          ) : null}
+        </>
       ) : null}
 
       <TableHeaderComponent
@@ -1413,71 +1277,119 @@ console.log(invoices, "inv")
         }
       />
       <Card className="overflow-hidden">
+        {isInvoiceAdmin ? (
         <div className="px-6 pt-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex flex-col md:col-span-1">
-              <label className="text-sm font-medium text-gray-700 mb-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">
+                Company
+              </label>
+              <CustomSelect
+                options={companyFilterOptions}
+                value={selectedCompanyFilterOption}
+                onChange={(nextOption) =>
+                  setSelectedCompanyFilterOption(nextOption ?? ALL_COMPANIES_OPTION)
+                }
+                onInputChange={(inputValue, actionMeta) => {
+                  if (actionMeta.action === "input-change") {
+                    setCompanyFilterSearchTerm(inputValue);
+                  }
+                  return inputValue;
+                }}
+                placeholder={
+                  isCompanyFilterOptionsLoading
+                    ? "Loading companies..."
+                    : "Search company"
+                }
+                isLoading={isCompanyFilterOptionsLoading}
+                isDisabled={false}
+                className="w-full"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">
+                Month
+              </label>
+              <select
+                value={selectedMonthFilter}
+                onChange={(event) => setSelectedMonthFilter(event.target.value)}
+                className={INVOICE_FILTER_SELECT_CLASSNAME}
+              >
+                <option value="">All months</option>
+                {COMMISSION_MONTH_OPTIONS.map((monthOption) => (
+                  <option key={monthOption.value} value={monthOption.value}>
+                    {monthOption.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">
+                Week
+              </label>
+              <select
+                value={selectedWeekFilter}
+                onChange={(event) => setSelectedWeekFilter(event.target.value)}
+                className={INVOICE_FILTER_SELECT_CLASSNAME}
+              >
+                <option value="">All weeks</option>
+                {COMMISSION_WEEK_OPTIONS.map((weekOption) => (
+                  <option key={weekOption.value} value={weekOption.value}>
+                    {weekOption.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="invoice-list-mpan-mprn-filter"
+                className="text-sm font-medium text-gray-700"
+              >
                 MPAN / MPRN
               </label>
               <input
+                id="invoice-list-mpan-mprn-filter"
                 type="text"
                 inputMode="numeric"
                 pattern="\d*"
-                value={advancedFilterInputs.mpanMprn}
-                onChange={(e) =>
-                  handleAdvancedFilterInputChange("mpanMprn", e.target.value)
+                value={mpanMprnFilter}
+                onChange={(event) =>
+                  setMpanMprnFilter(event.target.value.replace(/\D/g, ""))
                 }
                 placeholder="Enter MPAN or MPRN"
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <div className="flex flex-col md:col-span-1">
-              <label className="text-sm font-medium text-gray-700 mb-1">
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="invoice-list-postcode-filter"
+                className="text-sm font-medium text-gray-700"
+              >
                 Post Code
               </label>
               <input
+                id="invoice-list-postcode-filter"
                 type="text"
-                value={advancedFilterInputs.postcode}
-                onChange={(e) =>
-                  handleAdvancedFilterInputChange("postcode", e.target.value)
-                }
+                value={postcodeFilter}
+                onChange={(event) => setPostcodeFilter(event.target.value)}
                 placeholder="Enter post code"
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <div className="flex flex-col md:col-span-1">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Business Name
-              </label>
-              <input
-                type="text"
-                value={advancedFilterInputs.businessName}
-                onChange={(e) =>
-                  handleAdvancedFilterInputChange("businessName", e.target.value)
-                }
-                placeholder="Enter business name"
-                className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Date Range
-              </label>
-              <DateRangePicker
-                onRangeChange={(formattedRange, startDate, endDate) =>
-                  console.log("Date range:", formattedRange, startDate, endDate)
-                }
-              />
-            </div>
+
             <div className="flex flex-col justify-end gap-2 md:flex-row md:items-end md:justify-end md:col-span-2 lg:col-span-4">
               <button
-                onClick={handleApplyAdvancedFilters}
+                onClick={handleApplyInvoiceFilters}
                 className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
               >
                 Apply Filters
               </button>
               <button
-                onClick={handleClearAdvancedFilters}
+                onClick={handleClearInvoiceFilters}
                 className="border border-primary text-primary px-4 py-2 rounded text-sm font-medium hover:bg-primary-soft transition-colors cursor-pointer"
               >
                 Clear
@@ -1485,28 +1397,31 @@ console.log(invoices, "inv")
             </div>
           </div>
         </div>
+        ) : null}
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary text-primary-foreground">
                 <TableHead>Details</TableHead>
-                <TableHead>Latest Invoice Date</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Invoice Count</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Download</TableHead>
+                <TableHead>Invoice Date</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Amount excl VAT</TableHead>
+                <TableHead>VAT</TableHead>
+                <TableHead>Clawback</TableHead>
+                <TableHead>Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     Loading invoices...
                   </TableCell>
                 </TableRow>
               ) : invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     No invoices found
                   </TableCell>
                 </TableRow>
@@ -1516,40 +1431,40 @@ console.log(invoices, "inv")
                   const minusRowTextClass = isMinusRow ? "text-red-500" : undefined;
 
                   return (
-                  <TableRow key={invoice.id || idx}>
-                    <TableCell className={minusRowTextClass}>
-                      {invoice.id ? (
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                        >
-                          <InfoButton>
-                            View
-                          </InfoButton>
-                        </Link>
-                      ) : (
-                        invoice.id?.split("-")[0] || "N/A"
-                      )}
-                    </TableCell>
-                    <TableCell className={minusRowTextClass}>{invoice.exported_on_date ? 
-                        (formattedDates[invoice.id] || "Loading...") : 
+                    <TableRow key={invoice.id || idx}>
+                      <TableCell className={minusRowTextClass}>
+                        {invoice.id ? (
+                          <Link href={`/invoices/${invoice.id}`}>
+                            <InfoButton>{invoice.id.split("-")[0]}</InfoButton>
+                          </Link>
+                        ) : (
+                          "N/A"
+                        )}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>{invoice.exported_on_date ?
+                        (formattedDates[invoice.id] || "Loading...") :
                         "N/A"
                       }</TableCell>
-                    <TableCell className={minusRowTextClass}>{invoice.company_name || "N/A"}</TableCell>
-                    <TableCell className={minusRowTextClass}>{invoice.contract_count ?? 0}</TableCell>
-                    <TableCell className={minusRowTextClass}>{invoice.net_payment_due || invoice.total_amount || "N/A"}</TableCell>
-                    <TableCell className={minusRowTextClass}>
-                      <button
-                        onClick={() => handleDownload(invoice)}
-                        className={
-                          isMinusRow
-                            ? "text-red-500 underline-offset-2 hover:text-red-600 hover:underline transition-colors cursor-pointer"
-                            : "text-primary underline-offset-2 hover:underline transition-colors cursor-pointer"
-                        }
-                      >
-                        Download
-                      </button>
-                    </TableCell>
-                  </TableRow>
+                      <TableCell className={minusRowTextClass}>
+                        {invoice.reference || "N/A"}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>
+                        {invoice.item_count ?? 0}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>
+                        {formatCurrencyValue(invoice.amount_excluding_vat)}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>
+                        {formatCurrencyValue(invoice.vat_amount)}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>
+                        {formatCurrencyValue(invoice.clawback_amount)}
+                      </TableCell>
+                      <TableCell className={minusRowTextClass}>
+                        {formatCurrencyValue(invoice.final_total)}{" "}
+                        ({invoice.add_vat ? "incl. VAT" : "excl. VAT"})
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}

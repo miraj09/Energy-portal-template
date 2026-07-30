@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/ui";
 import { Site, Meter } from "../types";
+import { buildMeterReferenceForDisplay } from "@/composable/meterQuoteForm";
 
 interface SubmittedContactsModalProps {
   isOpen: boolean;
@@ -33,26 +34,6 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
   onClose,
   sites,
 }) => {
-  const parseMeterReference = (meterRef: string) => {
-    const chars = (meterRef || "").split("");
-    let currentIndex = 0;
-    const parts = [1, 2, 3, 3, 2, 4, 4, 3].map((count) => {
-      const part = chars.slice(currentIndex, currentIndex + count).join("");
-      currentIndex += count;
-      return part || "0".repeat(count);
-    });
-    return {
-      indicator: parts[0] || "S",
-      topRow: [parts[1] || "00", parts[2] || "000", parts[3] || "000"],
-      bottomRow: [
-        parts[4] || "00",
-        parts[5] || "0000",
-        parts[6] || "0000",
-        parts[7] || "000",
-      ],
-    };
-  };
-
   const unsoldMetersBySite = sites.map((site) => ({
     site,
     meters: (site.meters || []).filter((m: Meter) => m.latest_issold),
@@ -97,7 +78,7 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                   </div>
                   <div className="p-4 space-y-6">
                     {meters.map((m) => {
-                      const ref = parseMeterReference(m.meter_reference || "");
+                      const ref = buildMeterReferenceForDisplay(m);
                       return (
                         <div key={m.meterid} className="border rounded">
                           <div className="grid grid-cols-1 md:grid-cols-1 gap-4 p-4">

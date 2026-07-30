@@ -7,22 +7,23 @@ import { Input } from "@/ui/input";
 // import Image from "next/image";
 import CustomDateInput from "@/ui/customDateInput";
 import { useRouter } from "next/navigation";
-import { postMethod } from "@/lib/actions/postMethod";
 import { toast } from "sonner";
 import {
   createApplicationMeter,
   CreateApplicationMeterPayload,
+  extractMeterIdFromApiResponse,
 } from "@/composable/createApplicationMeter";
+import {
+  extractQuoteHeaderId,
+  getQuoteApiErrorMessage,
+  postQuoteHeader,
+} from "@/composable/quoteHeaderApi";
 import { updateApplicationMeter } from "@/composable/updateApplicationMeter";
 import { Meter } from "@/components/ApplicationDetails/types";
-import { MeterQuoteFormValues } from "@/composable/meterQuoteForm";
-
-// Interface for the quote header response
-interface QuoteHeaderResponse {
-  id?: string | number;
-  Quote_Header_ID?: string | number;
-  [key: string]: unknown;
-}
+import {
+  buildFlatQuotePayload,
+  MeterQuoteFormValues,
+} from "@/composable/meterQuoteForm";
 
 // Interface for supplier data
 interface Supplier {
@@ -139,10 +140,11 @@ const customSelectStyles: StylesConfig<SupplierOption, false, GroupBase<Supplier
 };
 
 interface QuoteDetailsSectionProps {
-  variant?: "page" | "modal";
+  variant?: "page" | "modal" | "applicationQuote";
   companyId?: string;
   siteId?: number;
   meterId?: number;
+  quoteId?: number;
   defaultPostcode?: string;
   initialQuoteData?: MeterQuoteFormValues | null;
   onSuccess?: (meter?: Meter) => void;
@@ -153,12 +155,15 @@ export const QuoteDetailsSection = ({
   companyId,
   siteId,
   meterId,
+  quoteId,
   defaultPostcode = "",
   initialQuoteData = null,
   onSuccess,
 }: QuoteDetailsSectionProps = {}): JSX.Element => {
   const router = useRouter();
   const isModal = variant === "modal";
+  const isApplicationQuote = variant === "applicationQuote";
+  const isModalLike = isModal || isApplicationQuote;
   const isEditMode = isModal && meterId != null;
 
   // State for form fields
@@ -178,12 +183,12 @@ export const QuoteDetailsSection = ({
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [suppliersLoading, setSuppliersLoading] = useState<boolean>(true);
 
-  // Sync postcode when site changes in modal mode
+  // Sync postcode when site changes in modal / application quote mode
   useEffect(() => {
-    if (isModal && defaultPostcode && !initialQuoteData) {
+    if (isModalLike && defaultPostcode && !initialQuoteData) {
       setPostcode(defaultPostcode);
     }
-  }, [isModal, defaultPostcode, initialQuoteData]);
+  }, [isModalLike, defaultPostcode, initialQuoteData]);
 
   // Populate form when editing with fetched meter data
   useEffect(() => {
@@ -312,58 +317,19 @@ export const QuoteDetailsSection = ({
       });
   }, []);
 
-  // Build the payload according to the API specification
+  // Build flat quote-header payload (new API — no Contract_Rates)
   const buildPayload = () => {
-    // Build contract rates array
-    const contractRates = [];
-    
-    // Rate type 1: Standing charge
-    if (currentStandingCharge) {
-      contractRates.push({
-        rate_type: 1,
-        rate: parseFloat(currentStandingCharge),
-        usage: null
-      });
-    }
-    
-    // Rate type 2: Day rate
-    if (dayRate && dayKwh) {
-      contractRates.push({
-        rate_type: 2,
-        rate: parseFloat(dayRate),
-        usage: parseInt(dayKwh),
-        rate_required: true,
-        usage_required: true
-      });
-    }
-
-    const aqEac = dayKwh.trim() ? parseInt(dayKwh, 10) : 0;
-
-    return {
-      // MPAN-related fields (required by API but not used for gas quotes)
-      profileclass: null,
-      MTC: null,
-      LLF: null,
-      Region: null,
-      
-      // Gas-specific fields
-      bottomline: mprn || "", // MPRN input value sent as bottomline field
-      postcode: postcode || null, // Postcode will be sent
-      
-      // Common fields
-      Supplier: selectedSupplier?.id, // Use selected supplier ID or fallback to default
-      Number_of_Days: parseInt(numberOfDays) || 365,
-      PartnerUserID: null,
-      isCOT: false,
-      isRIsk: false,
-      useUplift: true,
-      MeterType: 20, // Default value for gas
-      Term: null,
-      Contract_Start_Date: contractStartDate || new Date().toISOString(),
-      Contract_Rates: contractRates,
-      is_mrpn: true,
-      aq_eac: aqEac > 0 ? aqEac : null,
-    };
+    return buildFlatQuotePayload({
+      isGas: true,
+      bottomline: mprn || "",
+      postcode: postcode || null,
+      supplierId: selectedSupplier?.id,
+      numberOfDays,
+      contractStartDate,
+      currentStandingCharge,
+      dayRate,
+      dayKwh,
+    });
   };
 
   // Validate required fields before submission
@@ -437,13 +403,67 @@ export const QuoteDetailsSection = ({
     const hasErrors = validateRequiredFields();
     
     if (hasErrors) {
-      return; // Return early if validation fails, errors are already displayed below inputs
+      toast.error("Please complete all required fields before continuing.");
+      return;
     }
 
     try {
       setIsSubmitting(true);
       
       const payload = buildPayload();
+
+      // Application quote flow: meter first (auto-creates quote), then patch rates
+      if (isApplicationQuote && companyId && siteId) {
+        const meterResponse = await createApplicationMeter({
+          company_id: companyId,
+          site_id: siteId,
+          meter_type: "Gas",
+          meter_reference: mprn,
+          quote_payload: payload,
+        });
+
+        if (!meterResponse.success) {
+          if (
+            meterResponse.errors &&
+            typeof meterResponse.errors === "object" &&
+            "authError" in meterResponse.errors
+          ) {
+            toast.error("Token expired. Authentication required.");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            router.push("/login");
+          } else {
+            toast.error(
+              meterResponse.message ||
+                "Failed to create meter and quote. Please try again."
+            );
+          }
+          return;
+        }
+
+        const createdMeterId =
+          extractMeterIdFromApiResponse(meterResponse.data) ??
+          meterResponse.data?.meterid ??
+          null;
+        const quoteHeaderId = meterResponse.quoteId ?? null;
+
+        if (!createdMeterId || !quoteHeaderId) {
+          toast.error("Meter created but required IDs were not returned.");
+          return;
+        }
+
+        const params = new URLSearchParams({
+          quoteId: String(quoteHeaderId),
+          companyId,
+          siteId: String(siteId),
+          meterId: String(createdMeterId),
+          source: "application",
+        });
+
+        router.push(
+          `/generate-quote/gas-quote/quote-list?${params.toString()}`
+        );
+        return;
+      }
 
       // Modal mode: create or update meter for application site
       if (isModal && companyId && siteId && onSuccess) {
@@ -453,6 +473,7 @@ export const QuoteDetailsSection = ({
           meter_type: "Gas",
           meter_reference: mprn,
           quote_payload: payload,
+          quote_id: quoteId,
         };
 
         const response = isEditMode
@@ -478,30 +499,24 @@ export const QuoteDetailsSection = ({
         return;
       }
 
-      console.log("Submitting payload:", payload);
-      
-      const response = await postMethod(
-        payload,
-        "/api/v1/auth/web/core/quote-header/"
-      );
-      
-      if (response.success) {
-        // Extract the Quote_Header_ID from the response
-        const responseData = response.data as QuoteHeaderResponse;
-        const quoteHeaderId = responseData?.id || responseData?.Quote_Header_ID;
-        
+      const quoteResponse = await postQuoteHeader(payload);
+
+      if (quoteResponse.success) {
+        const quoteHeaderId =
+          quoteResponse.quoteId ?? extractQuoteHeaderId(quoteResponse);
+
         if (quoteHeaderId) {
           router.push(`gas-quote/quote-list?quoteId=${quoteHeaderId}`);
         } else {
           router.push("gas-quote/quote-list");
         }
       } else {
-        console.error("Quote submission failed:", response.message);
-        alert(`Quote submission failed: ${response.message}`);
+        console.error("Quote submission failed:", quoteResponse.message);
+        toast.error(getQuoteApiErrorMessage(quoteResponse));
       }
     } catch (error) {
       console.error("Error submitting quote:", error);
-      if (isModal) {
+      if (isModalLike) {
         toast.error("An error occurred while adding the meter");
       } else {
         alert("An error occurred while submitting the quote");
@@ -523,14 +538,14 @@ export const QuoteDetailsSection = ({
   return (
     <section
       className={
-        isModal
+        isModalLike
           ? "w-full bg-white"
           : "w-full max-w-[1106px] mx-auto my-4 lg:my-8 px-4 lg:px-0 bg-white"
       }
     >
       <Card
         className={
-          isModal
+          isModalLike
             ? "w-full border-0 shadow-none rounded-lg"
             : "w-full shadow-[0px_4px_10px_rgba(0,0,0,0.25)] rounded-lg"
         }
@@ -782,9 +797,11 @@ export const QuoteDetailsSection = ({
                 ? "Submitting..."
                 : isEditMode
                   ? "Update Meter"
-                  : isModal
-                    ? "Add Meter"
-                    : "Get Quote"}
+                  : isApplicationQuote
+                    ? "Get Quote"
+                    : isModal
+                      ? "Add Meter"
+                      : "Get Quote"}
             </Button>
           </div>
         </CardContent>

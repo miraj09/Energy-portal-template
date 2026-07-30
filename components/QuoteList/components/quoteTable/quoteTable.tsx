@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { QuoteDetailsModal } from "./QuoteDetailsModal";
 import { GasQuoteDetailsModal } from "./GasQuoteDetailsModal";
 import { CostBreakdownModal } from "./CostBreakdownModal";
+import ConfirmTariffModal from "./ConfirmTariffModal";
 import { branding } from "@/lib/config/branding";
 // import { getQuoteHeader } from "@/lib/actions/getQuoteHeader";
 
@@ -49,14 +50,18 @@ interface QuoteHeaderData {
   postcode: string | null;
   Supplier: number;
   Number_of_Days: number;
-  PartnerUserID: string | null;
-  isCOT: boolean;
-  isRIsk: boolean;
-  useUplift: boolean;
-  MeterType: number;
-  Term: string | null;
   Contract_Start_Date: string;
-  Contract_Rates: Array<{
+  standing_charge?: string | number | null;
+  day_rate?: string | number | null;
+  day_kwh?: string | number | null;
+  night_rate?: string | number | null;
+  night_kwh?: string | number | null;
+  ew_rate?: string | number | null;
+  ew_kwh?: string | number | null;
+  winter_rate?: string | number | null;
+  winter_kwh?: string | number | null;
+  /** Legacy — fallback read only */
+  Contract_Rates?: Array<{
     rate: number;
     usage: number | null;
     rate_type: number;
@@ -86,6 +91,10 @@ interface QuoteDataItem {
 interface QuoteTableProps {
   quoteType?: "electricity" | "gas";
   quoteId?: string | null;
+  companyId?: string | null;
+  siteId?: string | null;
+  meterId?: string | null;
+  source?: string | null;
 }
 
 /** Parse display strings like "1,234.56" into a number for commission math. */
@@ -105,8 +114,14 @@ function formatCommissionPounds(amount: number): string {
 export const QuoteTable = ({
   quoteType = "electricity",
   quoteId,
+  companyId,
+  siteId,
+  meterId,
+  source,
 }: QuoteTableProps): JSX.Element => {
   const router = useRouter();
+  const isApplicationFlow =
+    source === "application" && !!companyId && !!meterId;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGasModalOpen, setIsGasModalOpen] = useState(false);
   const [isCostBreakdownModalOpen, setIsCostBreakdownModalOpen] =
@@ -115,6 +130,9 @@ export const QuoteTable = ({
     useState<GasQuoteDetailsData | null>(null);
   const [selectedCostBreakdown, setSelectedCostBreakdown] =
     useState<CostBreakdownData | null>(null);
+  const [isConfirmTariffOpen, setIsConfirmTariffOpen] = useState(false);
+  const [selectedTariffQuote, setSelectedTariffQuote] =
+    useState<QuoteDataItem | null>(null);
   const [isCustomerView, setIsCustomerView] = useState(true);
   /** Commission rate (0–3%, step 0.1): row commission = totalCost × rate / 100. */
   const [commissionPercent, setCommissionPercent] = useState(1);
@@ -352,6 +370,46 @@ export const QuoteTable = ({
     setSelectedCostBreakdown(null);
   };
 
+  const handleSoldTariff = (quote: QuoteDataItem) => {
+    if (isApplicationFlow && companyId && meterId) {
+      setSelectedTariffQuote(quote);
+      setIsConfirmTariffOpen(true);
+      return;
+    }
+
+    if (source === "application" && (!companyId || !meterId)) {
+      console.warn(
+        "Application flow missing companyId or meterId; falling back to Sold Tariff form."
+      );
+    }
+
+    const basePath =
+      quoteType === "gas"
+        ? `/generate-quote/gas-quote/quote-list/sold-tariff/${quoteId}`
+        : `/generate-quote/electricity-quote/quote-list/sold-tariff/${quoteId}`;
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("sold_supplier_id", quote.id.toString());
+        sessionStorage.setItem("sold_supplier_name", quote.supplier_name);
+        sessionStorage.setItem(
+          "sold_latesttariffname",
+          quote.latesttariffname
+        );
+        sessionStorage.setItem("sold_meterstring", quote.meterstring);
+        // Contract length for company POST `latestterm` (e.g. "12 months")
+        sessionStorage.setItem("sold_term", quote.term);
+      }
+    } catch (err) {
+      console.error("Failed to write sold tariff data to sessionStorage", err);
+    }
+    router.push(basePath);
+  };
+
+  const handleCloseConfirmTariff = () => {
+    setIsConfirmTariffOpen(false);
+    setSelectedTariffQuote(null);
+  };
+
   return (
     <section className="w-full max-w-[1106px] mx-auto my-4 lg:my-8 px-4 lg:px-0 bg-white">
       <Card className="w-full shadow-[0px_4px_10px_rgba(0,0,0,0.25)] rounded-lg">
@@ -577,63 +635,7 @@ export const QuoteTable = ({
                       <Button
                         variant="default"
                         className="bg-[#346fb6] text-white h-[36px] md:h-[28px] sm:h-[22px] px-4 md:px-2 sm:px-1 py-2 sm:py-1 mb-2 text-sm md:text-xs sm:text-[11px]"
-                        onClick={() => {
-                          const basePath =
-                            quoteType === "gas"
-                              ? `/generate-quote/gas-quote/quote-list/sold-tariff/${quoteId}`
-                              : `/generate-quote/electricity-quote/quote-list/sold-tariff/${quoteId}`;
-                          try {
-                            if (typeof window !== "undefined") {
-                              // sessionStorage.setItem(
-                              //   "sold_supplier_id",
-                              //   (quoteHeaderData as any)?.supplier_id ||
-                              //     quoteData.find((q) => q.id === quote.id)
-                              //       ?.supplier ||
-                              //     "",
-                              // );
-                              // sessionStorage.setItem(
-                              //   "sold_supplier_name",
-                              //   (quoteHeaderData as any)?.supplier_name ||
-                              //     quoteData.find((q) => q.id === quote.id)
-                              //       ?.supplier_name ||
-                              //     "",
-                              // );
-                              // sessionStorage.setItem(
-                              //   "sold_latesttariffname",
-                              //   (quoteHeaderData as any)?.latesttariffname ||
-                              //     quoteData.find((q) => q.id === quote.id)
-                              //       ?.latesttariffname ||
-                              //     "",
-                              // );
-                              // sessionStorage.setItem(
-                              //   "sold_meterstring",
-                              //   quoteHeaderData?.bottomline || "",
-                              // );
-                              sessionStorage.setItem(
-                                "sold_supplier_id",
-                                quote.id.toString(),
-                              );
-                              sessionStorage.setItem(
-                                "sold_supplier_name",
-                                quote.supplier_name,
-                              );
-                              sessionStorage.setItem(
-                                "sold_latesttariffname",
-                                quote.latesttariffname,
-                              );
-                              sessionStorage.setItem(
-                                "sold_meterstring",
-                                quote.meterstring,
-                              );
-                            }
-                          } catch (err) {
-                            console.error(
-                              "Failed to write sold tariff data to sessionStorage",
-                              err,
-                            );
-                          }
-                          router.push(basePath);
-                        }}
+                        onClick={() => handleSoldTariff(quote)}
                       >
                         Sold Tariff
                       </Button>
@@ -689,6 +691,16 @@ export const QuoteTable = ({
         quoteData={selectedCostBreakdown || undefined}
         isCustomerView={isCustomerView}
       />
+
+      {isApplicationFlow && companyId && meterId && (
+        <ConfirmTariffModal
+          isOpen={isConfirmTariffOpen}
+          onClose={handleCloseConfirmTariff}
+          quote={selectedTariffQuote}
+          meterId={Number.parseInt(meterId, 10)}
+          companyId={companyId}
+        />
+      )}
     </section>
   );
 };

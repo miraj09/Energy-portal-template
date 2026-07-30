@@ -1,9 +1,12 @@
+import { checkPermission } from "@/lib/permissions/checkPermission";
+
 type MenuPermission = {
   section?: string;
   action?: string;
 };
 
 type MenuItem = {
+  id?: string;
   label: string;
   href?: string;
   permission_code?: MenuPermission;
@@ -18,19 +21,27 @@ export function filterMenuForServer(
     if (!permission) return true;
     const { section, action } = permission;
     if (!section || !action) return true;
-    const sectionPermissions = permissions[section];
-    if (!sectionPermissions) return false;
-    return sectionPermissions.has(action);
+    return checkPermission(permissions, section, action);
   };
 
   const prune = (items: MenuItem[]): MenuItem[] =>
     items
-      .filter((item) => hasPermission(item.permission_code))
       .map((item) => {
-        if (!item.submenu) return item;
-        const children = prune(item.submenu);
-        if (children.length === 0) return null;
-        return { ...item, submenu: children };
+        if (item.submenu?.length) {
+          const children = prune(item.submenu);
+          if (children.length === 0) return null;
+
+          // Folder-style parents without their own route are shown when any child is allowed.
+          if (!item.href) {
+            return { ...item, submenu: children };
+          }
+
+          if (!hasPermission(item.permission_code)) return null;
+          return { ...item, submenu: children };
+        }
+
+        if (!hasPermission(item.permission_code)) return null;
+        return item;
       })
       .filter((item): item is MenuItem => item !== null);
 

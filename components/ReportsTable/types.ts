@@ -3,8 +3,10 @@
  * The reports table uses `ContactRecord` from ExportContractTable for fetching;
  * this type documents the extra flat fields returned on each result.
  */
+import type { SubmittedByValue } from "@/components/ExportContractTable/type";
+
 export interface UtilityReportRowFields {
-  submitted_by?: string | null;
+  submitted_by?: SubmittedByValue;
   company_name?: string | null;
   post_code?: string | null;
   aq_eac?: string | null;

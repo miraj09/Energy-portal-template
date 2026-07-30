@@ -10,6 +10,7 @@ import type { SoldTariffFormData, ValidationErrors } from "./SoldTariffForm";
 import StepIndicator from "./StepIndicator";
 import { useGetRequest } from "@/composable";
 import { getLocationByPostcode } from "@/lib/actions/getLocationByPostcode";
+import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
 import { getDropdown } from "@/lib/actions/getDropdown";
 
 // Title options for contact (shared with Page 2)
@@ -188,7 +189,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
     owner_partner_dobstring: string;
     time_at_current_address_months: string | null;
     primary_telephone_number: string | null;
-    business_type: number;
+    business_type?: number | { id: number; title?: string; name?: string } | null;
     business_type_name?: string;
     contacts?: Array<{
       id: string;
@@ -207,6 +208,22 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
       bank_name: string;
       account_name: string;
     }>;
+    bank?: {
+      id?: number;
+      account_number?: string;
+      sort_code?: string;
+      bank_name?: string;
+      account_name?: string;
+    } | null;
+    primary_contact?: {
+      id?: string;
+      first_name?: string;
+      last_name?: string;
+      position?: string | null;
+      email?: string;
+      title?: string | null;
+      telephone?: string;
+    } | null;
     [key: string]: unknown;
   }
 
@@ -505,9 +522,10 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
             }
 
             // Business type - find matching option
-            if (companyData.business_type) {
+            const businessTypePk = resolveBusinessTypePk(companyData.business_type);
+            if (businessTypePk != null) {
               const businessTypeOption = businessTypeOptions.find(
-                (opt) => opt.value === String(companyData.business_type)
+                (opt) => opt.value === String(businessTypePk)
               );
               if (businessTypeOption) {
                 handleInput("businessType", businessTypeOption);
@@ -575,71 +593,90 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
               handleInput("timeAtAddressMonth", String(remainingMonths));
             }
 
-            // Primary contact details from contacts array
-            if (companyData.contacts && Array.isArray(companyData.contacts)) {
+            const applyPrimaryContactAutofill = (
+              primaryContact: {
+                title?: string | null;
+                first_name?: string;
+                last_name?: string;
+                position?: string | null;
+                job_title?: string;
+                email?: string;
+                email_address?: string;
+                telephone?: string;
+                telephone1?: string;
+              }
+            ) => {
+              if (primaryContact.title) {
+                const normalizedApiTitle = normalizeTitle(primaryContact.title);
+                const titleOption = titleOptions.find((opt) => {
+                  const normalizedValue = normalizeTitle(opt.value);
+                  const normalizedLabel = normalizeTitle(opt.label);
+                  return (
+                    normalizedValue === normalizedApiTitle ||
+                    normalizedLabel === normalizedApiTitle
+                  );
+                });
+                if (titleOption) {
+                  handleInput("primaryContactTitle", titleOption);
+                }
+              }
+
+              if (primaryContact.first_name) {
+                handleInput("primaryContactFirstName", primaryContact.first_name);
+              }
+              if (primaryContact.last_name) {
+                handleInput("primaryContactLastName", primaryContact.last_name);
+              }
+              const position =
+                primaryContact.position ?? primaryContact.job_title ?? "";
+              if (position) {
+                handleInput("primaryContactPosition", position);
+              }
+              const email =
+                primaryContact.email ?? primaryContact.email_address ?? "";
+              if (email) {
+                handleInput("primaryContactEmail", email);
+              }
+              const telephone =
+                primaryContact.telephone ?? primaryContact.telephone1 ?? "";
+              if (telephone) {
+                handleInput("telephoneNumber", telephone);
+              } else if (companyData.primary_telephone_number) {
+                handleInput("telephoneNumber", companyData.primary_telephone_number);
+              }
+            };
+
+            if (companyData.primary_contact) {
+              applyPrimaryContactAutofill(companyData.primary_contact);
+            } else if (companyData.contacts && Array.isArray(companyData.contacts)) {
               const primaryContact = companyData.contacts.find(
                 (contact) => contact.is_primary
               );
               if (primaryContact) {
-                // Primary contact title
-                if (primaryContact.title) {
-                  const normalizedApiTitle = normalizeTitle(primaryContact.title);
-                  const titleOption = titleOptions.find((opt) => {
-                    const normalizedValue = normalizeTitle(opt.value);
-                    const normalizedLabel = normalizeTitle(opt.label);
-                    return (
-                      normalizedValue === normalizedApiTitle ||
-                      normalizedLabel === normalizedApiTitle
-                    );
-                  });
-                  if (titleOption) {
-                    handleInput("primaryContactTitle", titleOption);
-                  }
-                }
-
-                // Primary contact first name
-                if (primaryContact.first_name) {
-                  handleInput("primaryContactFirstName", primaryContact.first_name);
-                }
-
-                // Primary contact last name
-                if (primaryContact.last_name) {
-                  handleInput("primaryContactLastName", primaryContact.last_name);
-                }
-
-                // Primary contact position
-                if (primaryContact.job_title) {
-                  handleInput("primaryContactPosition", primaryContact.job_title);
-                }
-
-                // Primary contact email
-                if (primaryContact.email_address) {
-                  handleInput("primaryContactEmail", primaryContact.email_address);
-                }
-
-                // Telephone number
-                if (primaryContact.telephone1) {
-                  handleInput("telephoneNumber", primaryContact.telephone1);
-                } else if (companyData.primary_telephone_number) {
-                  handleInput("telephoneNumber", companyData.primary_telephone_number);
-                }
+                applyPrimaryContactAutofill(primaryContact);
               }
             }
 
-            // Bank details (Page 4)
-            if (companyData.banks && Array.isArray(companyData.banks) && companyData.banks.length > 0) {
-              const bank = companyData.banks[0]; // Use first bank
-              if (bank.account_number) {
-                handleInput("accountNumber", bank.account_number);
+            const resolvedBank =
+              companyData.bank ??
+              (companyData.banks &&
+              Array.isArray(companyData.banks) &&
+              companyData.banks.length > 0
+                ? companyData.banks[0]
+                : null);
+
+            if (resolvedBank) {
+              if (resolvedBank.account_number) {
+                handleInput("accountNumber", resolvedBank.account_number);
               }
-              if (bank.sort_code) {
-                handleInput("sortCode", bank.sort_code);
+              if (resolvedBank.sort_code) {
+                handleInput("sortCode", resolvedBank.sort_code);
               }
-              if (bank.bank_name) {
-                handleInput("bankName", bank.bank_name);
+              if (resolvedBank.bank_name) {
+                handleInput("bankName", resolvedBank.bank_name);
               }
-              if (bank.account_name) {
-                handleInput("accountName", bank.account_name);
+              if (resolvedBank.account_name) {
+                handleInput("accountName", resolvedBank.account_name);
               }
             }
 

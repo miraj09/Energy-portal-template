@@ -91,6 +91,24 @@ const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({
               : Standing charge : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {contractDetails.rates.standingCharge}
               <br />
               &nbsp;&nbsp;Day rate: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {contractDetails.rates.dayRate}
+              {contractDetails.rates.nightRate ? (
+                <>
+                  <br />
+                  &nbsp;&nbsp;Night rate: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {contractDetails.rates.nightRate}
+                </>
+              ) : null}
+              {contractDetails.rates.eveningWeekendRate ? (
+                <>
+                  <br />
+                  &nbsp;&nbsp;Evening/Weekend rate: &nbsp;&nbsp; {contractDetails.rates.eveningWeekendRate}
+                </>
+              ) : null}
+              {contractDetails.rates.winterRate ? (
+                <>
+                  <br />
+                  &nbsp;&nbsp;Winter rate: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {contractDetails.rates.winterRate}
+                </>
+              ) : null}
             </div>
           </div>
 

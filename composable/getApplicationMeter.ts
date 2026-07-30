@@ -4,6 +4,7 @@ import {
   mapMeterApiToQuoteFormValues,
   MeterQuoteFormValues,
 } from "@/composable/meterQuoteForm";
+import { extractQuoteIdFromApiResponse } from "@/composable/quoteHeaderApi";
 
 const GET_METER_ENDPOINT = "/api/v1/auth/web/core/meter";
 
@@ -11,6 +12,7 @@ export interface GetApplicationMeterResponse {
   success: boolean;
   data?: ApplicationMeterApiResponse;
   formValues?: MeterQuoteFormValues;
+  quoteId?: number;
   message?: string;
   errors?: unknown;
 }
@@ -44,5 +46,6 @@ export async function getApplicationMeter(
     success: true,
     data,
     formValues: mapMeterApiToQuoteFormValues(data),
+    quoteId: extractQuoteIdFromApiResponse(data) ?? undefined,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { checkPermission } from "@/lib/permissions/checkPermission";
 
 type PermissionState = {
   permissions: Record<string, Set<string>>;
@@ -42,9 +43,7 @@ const usePermissionStore = create<PermissionState>((set, get) => ({
   },
 
   hasPermission(section, action) {
-    const sectionPermissions = get().permissions[section];
-    if (!sectionPermissions) return false;
-    return sectionPermissions.has(action);
+    return checkPermission(get().permissions, section, action);
   },
 
   hasAnyPermission(section, actions) {

@@ -1,6 +1,7 @@
 import AddRole from "@/components/account/AddRole";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { getResource } from "@/lib/baseQueries";
+import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 import { isSessionExpired } from "@/lib/constants/authErrors";
 
 export default async function AddNewRolePage() {
@@ -14,7 +15,7 @@ export default async function AddNewRolePage() {
     const response = await getResource(
       "api/v1/auth/web/all-permissions-section-wise/",
       {},
-      { section: "authentication", action: "add_role" }
+      { section: SIDEBAR_NAVIGATION_SECTION, action: "add_role" }
     );
     const payload = (response.data || response) as Array<{
       name: string;

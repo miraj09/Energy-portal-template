@@ -18,12 +18,13 @@ import { DeleteConfirmationModal } from "@/ui";
 
 interface MeterDetailsSectionProps {
   meterDetails: MeterDetail[];
-  onViewContract: (meter: MeterDetail) => void;
+  onViewContract: (meter: MeterDetail) => void | Promise<void>;
   onMeterUpdate?: (updatedMeters: MeterDetail[]) => void;
   onMeterDeleted?: () => void | Promise<void>;
   onEditMeter?: (meter: MeterDetail) => void;
   onAddMeter?: () => void;
   hideAction?: boolean;
+  viewingMeterId?: number | null;
 }
 
 const MeterDetailsSection: React.FC<MeterDetailsSectionProps> = ({
@@ -34,6 +35,7 @@ const MeterDetailsSection: React.FC<MeterDetailsSectionProps> = ({
   onEditMeter,
   onAddMeter,
   hideAction = false,
+  viewingMeterId = null,
 }) => {
   const router = useRouter();
   // Local state for meters
@@ -332,13 +334,13 @@ const MeterDetailsSection: React.FC<MeterDetailsSectionProps> = ({
                             {meter.quoteDetails.sold ? (
                               <>
                                 <Button
-                                  onClick={() => {
-                                    onViewContract(meter);
-                                    console.log(meter, "meter");
-                                  }}
-                                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1 rounded text-sm w-28"
+                                  onClick={() => onViewContract(meter)}
+                                  disabled={viewingMeterId === meter.id}
+                                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1 rounded text-sm w-28 disabled:opacity-50"
                                 >
-                                  View
+                                  {viewingMeterId === meter.id
+                                    ? "Loading..."
+                                    : "View"}
                                 </Button>
                                 <Button
                                   onClick={() => handleUnSellMeter(meter)}

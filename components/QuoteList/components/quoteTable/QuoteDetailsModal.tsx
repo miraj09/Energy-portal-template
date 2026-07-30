@@ -9,6 +9,7 @@ import { Dialog, DialogContent } from "@/ui/modal";
 import { Switch } from "@/ui/switch";
 import { patchMethod } from "@/lib/actions/patchMethod";
 import { toast } from "sonner";
+import { buildFlatQuotePayload } from "@/composable/meterQuoteForm";
 
 // Import supplier types and context from the hook
 import { SupplierOption } from "@/hooks/useSuppliers";
@@ -25,14 +26,18 @@ interface QuoteHeaderData {
   postcode: string | null;
   Supplier: number;
   Number_of_Days: number;
-  PartnerUserID: string | null;
-  isCOT: boolean;
-  isRIsk: boolean;
-  useUplift: boolean;
-  MeterType: number;
-  Term: string | null;
   Contract_Start_Date: string;
-  Contract_Rates: Array<{
+  standing_charge?: string | number | null;
+  day_rate?: string | number | null;
+  day_kwh?: string | number | null;
+  night_rate?: string | number | null;
+  night_kwh?: string | number | null;
+  ew_rate?: string | number | null;
+  ew_kwh?: string | number | null;
+  winter_rate?: string | number | null;
+  winter_kwh?: string | number | null;
+  /** Legacy — fallback read only */
+  Contract_Rates?: Array<{
     rate: number;
     usage: number | null;
     rate_type: number;
@@ -234,35 +239,9 @@ export const QuoteDetailsModal = ({
     }
   }, []);
 
-  // Helper function to extract rates from Contract_Rates
+  // Read flat rate fields first; fall back to legacy Contract_Rates
   const extractRates = React.useCallback(() => {
-    if (!quoteHeaderData?.Contract_Rates) {
-      return {
-        currentStandingCharge: "",
-        dayRate: "",
-        dayKwh: "",
-        nightRate: "",
-        nightKwh: "",
-        ewRate: "",
-        ewKwh: "",
-        winterRate: "",
-        winterKwh: ""
-      };
-    }
-
-    interface ExtractedRates {
-      currentStandingCharge: string;
-      dayRate: string;
-      dayKwh: string;
-      nightRate: string;
-      nightKwh: string;
-      ewRate: string;
-      ewKwh: string;
-      winterRate: string;
-      winterKwh: string;
-    }
-
-    const rates: ExtractedRates = {
+    const empty = {
       currentStandingCharge: "",
       dayRate: "",
       dayKwh: "",
@@ -271,27 +250,57 @@ export const QuoteDetailsModal = ({
       ewRate: "",
       ewKwh: "",
       winterRate: "",
-      winterKwh: ""
+      winterKwh: "",
     };
 
-    quoteHeaderData.Contract_Rates.forEach(rate => {
+    if (!quoteHeaderData) return empty;
+
+    const hasFlatRates =
+      quoteHeaderData.standing_charge != null ||
+      quoteHeaderData.day_rate != null ||
+      quoteHeaderData.day_kwh != null;
+
+    if (hasFlatRates) {
+      const format = (value: string | number | null | undefined) =>
+        value == null ? "" : String(value);
+
+      return {
+        currentStandingCharge: format(quoteHeaderData.standing_charge),
+        dayRate: format(quoteHeaderData.day_rate),
+        dayKwh: format(quoteHeaderData.day_kwh),
+        nightRate: format(quoteHeaderData.night_rate),
+        nightKwh: format(quoteHeaderData.night_kwh),
+        ewRate: format(quoteHeaderData.ew_rate),
+        ewKwh: format(quoteHeaderData.ew_kwh),
+        winterRate: format(quoteHeaderData.winter_rate),
+        winterKwh: format(quoteHeaderData.winter_kwh),
+      };
+    }
+
+    if (!quoteHeaderData.Contract_Rates) {
+      return empty;
+    }
+
+    const rates = { ...empty };
+
+    quoteHeaderData.Contract_Rates.forEach((rate) => {
       switch (rate.rate_type) {
-        case 1: // Standing charge
+        case 1:
           rates.currentStandingCharge = rate.rate.toString();
           break;
-        case 2: // Day rate
+        case 2:
           rates.dayRate = rate.rate.toString();
           rates.dayKwh = rate.usage?.toString() || "";
           break;
-        case 3: // Night rate
+        case 3:
           rates.nightRate = rate.rate.toString();
           rates.nightKwh = rate.usage?.toString() || "";
           break;
-        case 4: // EW rate
+        case 4:
           rates.ewRate = rate.rate.toString();
           rates.ewKwh = rate.usage?.toString() || "";
           break;
-        case 5: // Winter rate
+        case 5:
           rates.winterRate = rate.rate.toString();
           rates.winterKwh = rate.usage?.toString() || "";
           break;
@@ -483,84 +492,37 @@ export const QuoteDetailsModal = ({
     }
   };
 
-  // Build the updated quote data in the format expected by the API
+  // Build flat quote-header PATCH payload (no Contract_Rates)
   const buildUpdatedQuoteData = () => {
-    // Concatenate MPAN values
     const profileclass = mpanTopValues[0] || "";
     const MTC = mpanTopValues[1] || "";
     const LLF = mpanTopValues[2] || "";
     const Region = mpanBottomValues[0] || "";
     const bottomline = mpanBottomValues.slice(1).join("") || "";
 
-    // Build contract rates array
-    const contractRates = [];
-    
-    // Standing charge (rate_type: 1)
-    if (formData.currentStandingCharge) {
-      contractRates.push({
-        rate: parseFloat(formData.currentStandingCharge),
-        usage: null,
-        rate_type: 1,
-        rate_required: true,
-        usage_required: false
-      });
-    }
-
-    // Day rate (rate_type: 2)
-    if (formData.dayRate) {
-      contractRates.push({
-        rate: parseFloat(formData.dayRate),
-        usage: formData.dayKwh ? parseFloat(formData.dayKwh) : null,
-        rate_type: 2,
-        rate_required: true,
-        usage_required: !!formData.dayKwh
-      });
-    }
-
-    // Night rate (rate_type: 3)
-    if (formData.nightRate) {
-      contractRates.push({
-        rate: parseFloat(formData.nightRate),
-        usage: formData.nightKwh ? parseFloat(formData.nightKwh) : null,
-        rate_type: 3,
-        rate_required: true,
-        usage_required: !!formData.nightKwh
-      });
-    }
-
-    // EW rate (rate_type: 4)
-    if (formData.ewRate) {
-      contractRates.push({
-        rate: parseFloat(formData.ewRate),
-        usage: formData.ewKwh ? parseFloat(formData.ewKwh) : null,
-        rate_type: 4,
-        rate_required: true,
-        usage_required: !!formData.ewKwh
-      });
-    }
-
-    // Winter rate (rate_type: 5)
-    if (formData.winterRate) {
-      contractRates.push({
-        rate: parseFloat(formData.winterRate),
-        usage: formData.winterKwh ? parseFloat(formData.winterKwh) : null,
-        rate_type: 5,
-        rate_required: true,
-        usage_required: !!formData.winterKwh
-      });
-    }
-
-    return {
+    return buildFlatQuotePayload({
+      isGas: false,
       profileclass,
       MTC,
       LLF,
       Region,
       bottomline,
-      Supplier: parseInt(formData.currentSupplier) || (quoteHeaderData?.Supplier || 0),
-      Number_of_Days: parseInt(formData.numberOfDays) || (quoteHeaderData?.Number_of_Days || 0),
-      Contract_Start_Date: formData.contractStartDate || (quoteHeaderData?.Contract_Start_Date || ""),
-      Contract_Rates: contractRates
-    };
+      postcode: quoteHeaderData?.postcode ?? null,
+      supplierId:
+        parseInt(formData.currentSupplier, 10) || quoteHeaderData?.Supplier,
+      numberOfDays: formData.numberOfDays,
+      contractStartDate:
+        formData.contractStartDate || quoteHeaderData?.Contract_Start_Date || "",
+      currentStandingCharge: formData.currentStandingCharge,
+      dayRate: formData.dayRate,
+      dayKwh: formData.dayKwh,
+      nightRate: formData.nightRate,
+      nightKwh: formData.nightKwh,
+      ewRate: formData.ewRate,
+      ewKwh: formData.ewKwh,
+      winterRate: formData.winterRate,
+      winterKwh: formData.winterKwh,
+    });
   };
 
   // Reset save states when modal opens/closes

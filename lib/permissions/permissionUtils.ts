@@ -2,8 +2,10 @@ import { buildUrl, isAuthFailure, parseResponse } from "@/lib/utils/apiUtils";
 import { getAuthHeaders } from "@/lib/utils/authUtils";
 import { CURRENT_USER_PERMISSIONS_REVALIDATE_TAG } from "@/lib/constants/revalidateTags";
 import { createSessionExpiredError, isSessionExpired } from "@/lib/constants/authErrors";
+import type { PermissionMap } from "@/lib/permissions/types";
+import { checkPermission } from "@/lib/permissions/checkPermission";
 
-export type PermissionMap = Record<string, Set<string>>;
+export type { PermissionMap } from "@/lib/permissions/types";
 
 type RawSection = {
   slug?: string;
@@ -76,7 +78,7 @@ export async function loadUserPermissions(): Promise<PermissionMap> {
 
 export async function hasPermission(section: string, action: string): Promise<boolean> {
   const permissions = await loadUserPermissions();
-  return permissions?.[section]?.has(action) ?? false;
+  return checkPermission(permissions, section, action);
 }
 
 export async function ensurePermission(section: string, action: string): Promise<void> {

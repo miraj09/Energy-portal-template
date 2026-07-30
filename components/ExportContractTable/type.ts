@@ -1,3 +1,16 @@
+/** User summary nested on contact / submitted sale rows from the API. */
+export type SubmittedByUser = {
+  id?: number | null;
+  name?: string | null;
+  username?: string | null;
+};
+
+export type SubmittedByValue =
+  | string
+  | number
+  | SubmittedByUser
+  | null;
+
 export type SubmittedSale = {
   id: number;
   created_at?: string | null;
@@ -7,7 +20,7 @@ export type SubmittedSale = {
   is_active?: boolean | null;
   reference?: string | null;
   submitted_datetime?: string | null;
-  submitted_by?: string | null;
+  submitted_by?: SubmittedByValue;
   lead_id?: number | null;
   partner_action_required?: boolean | null;
   not_interested_reason?: string | null;
@@ -53,6 +66,7 @@ export type Company = {
 export type ContactRecord = {
   id: string;
   company?: Company | null;
+  submitted_by?: SubmittedByValue;
   created_at?: string | null;
   updated_at?: string | null;
   deleted_at?: string | null;
