@@ -78,6 +78,15 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
   // Local loading state to cover both direct API and fallback fetch
   const [isSearching, setIsSearching] = useState(false);
   const [businessTypeOptions, setBusinessTypeOptions] = useState<SelectOption[]>([]);
+  /**
+   * Baseline home postcode for existing companies (auto-filled from company data).
+   * Find stays disabled until the user changes the input away from this value.
+   */
+  const [baselineHomePostCode, setBaselineHomePostCode] = useState(() =>
+    form.companyType === "existing"
+      ? (form.homePostCode?.trim().toUpperCase() || "")
+      : ""
+  );
 
   const handleBusinessTypesSuccess = useCallback((data: unknown) => {
     if (
@@ -232,6 +241,30 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     onError: handleLocationError,
   });
 
+  const isExistingCompany = form.companyType === "existing";
+  const normalizedHomePostCode = form.homePostCode?.trim().toUpperCase() || "";
+  const hasHomePostCodeChanged =
+    !isExistingCompany ||
+    (normalizedHomePostCode.length > 0 &&
+      normalizedHomePostCode !== baselineHomePostCode);
+
+  const isFindDisabled =
+    isSearching ||
+    isLoadingLocations ||
+    !normalizedHomePostCode ||
+    (isExistingCompany && !hasHomePostCodeChanged);
+
+  // Capture late-arriving auto-filled postcode for existing companies.
+  useEffect(() => {
+    if (!isExistingCompany) {
+      setBaselineHomePostCode("");
+      return;
+    }
+    if (!baselineHomePostCode && normalizedHomePostCode) {
+      setBaselineHomePostCode(normalizedHomePostCode);
+    }
+  }, [isExistingCompany, baselineHomePostCode, normalizedHomePostCode]);
+
   // Function to handle postcode search with fallback
   const handlePostcodeSearch = useCallback(async () => {
     if (form.homePostCode?.trim()) {
@@ -298,8 +331,10 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     }
   }, [form.homeLocation, form.homeAddress, locationItems, handleAddressInput]);
 
-  // Restore location dropdown and options when navigating back if homePostCode exists
+  // Restore location dropdown for new-company flow when navigating back with a postcode.
+  // Skip for existing companies — address is prefilled until the user changes postcode + Find.
   useEffect(() => {
+    if (form.companyType !== "new") return;
     if (form.homePostCode && form.homePostCode.trim()) {
       setShowLocationDropdown(true);
       if (locationOptions.length === 0) {
@@ -310,6 +345,21 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleHomePostCodeChange = (rawValue: string) => {
+    const nextValue = rawValue.toUpperCase();
+    handleInput("homePostCode", nextValue);
+
+    if (!isExistingCompany) return;
+
+    // Reset lookup UI until the user clicks Find again with the new postcode.
+    setShowLocationDropdown(false);
+    setLocationOptions([]);
+    setLocationItems([]);
+    if (form.homeLocation) {
+      handleInput("homeLocation", undefined);
+    }
+  };
 
   /**
    * Decide when to show the structured home address section.
@@ -507,12 +557,17 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                         className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${validationErrors.homePostCode ? 'border-red-500' : 'border-neutral-500'}`}
                         placeholder="E6 3BJ"
                         value={form.homePostCode}
-                        onChange={(e) => handleInput("homePostCode", e.target.value.toUpperCase())}
+                        onChange={(e) => handleHomePostCodeChange(e.target.value)}
                       />
                       <Button 
-                        className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px]"
+                        className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px] disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={handlePostcodeSearch}
-                        disabled={isSearching || isLoadingLocations || !form.homePostCode?.trim()}
+                        disabled={isFindDisabled}
+                        title={
+                          isExistingCompany && !hasHomePostCodeChanged
+                            ? "Change the postcode to look up a new address"
+                            : undefined
+                        }
                       >
                         {isSearching || isLoadingLocations ? "..." : "Find"}
                       </Button>
@@ -521,14 +576,14 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       <p className="text-sm text-red-500 mt-1">{validationErrors.homePostCode[0]}</p>
                     )}
                   </div>
-                  {/* 
+                  {/*
                     Location List (Dropdown)
-                    - Only show when postcode is provided, "Find" is clicked,
-                      AND the company is marked as "new".
-                    - For existing companies, the home address can be prefilled
-                      from the backend, so we hide this manual selection UI.
+                    - New company: shown after Find, same as before.
+                    - Existing company: shown only after the user changes postcode and clicks Find.
+                    Selecting a location always replaces the home address fields.
                   */}
-                  {showLocationDropdown && form.companyType === "new" && (
+                  {showLocationDropdown &&
+                    (form.companyType === "new" || hasHomePostCodeChanged) && (
                     <div>
                       <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
                         Location List <span className="text-red-500">*</span>
@@ -544,6 +599,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                             const selected = Number.isNaN(index) ? undefined : locationItems[index];
                             if (selected && selected.address) {
                               const addr = selected.address;
+                              // Always replace address lines on location select
                               handleAddressInput(0, addr.premises || '');
                               handleAddressInput(1, addr.address_line_1 || '');
                               handleAddressInput(2, addr.locality || '');
@@ -586,34 +642,56 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                   <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-3">
                     Address <span className="text-red-500">*</span>
                   </Label>
-                  <div className="bg-[#ffffff] rounded-lg border border-solid border-[#c4c4c4] p-4 lg:p-6">
+                  <div
+                    className={`bg-[#ffffff] rounded-lg border border-solid p-4 lg:p-6 ${
+                      validationErrors.homeAddress
+                        ? "border-red-500"
+                        : "border-[#c4c4c4]"
+                    }`}
+                  >
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                      <Input
-                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
-                        placeholder="45"
-                        value={form.homeAddress[0]}
-                        onChange={(e) => handleAddressInput(0, e.target.value)}
-                      />
-                      <Input
-                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
-                        placeholder="Macaulay Road"
-                        value={form.homeAddress[1]}
-                        onChange={(e) => handleAddressInput(1, e.target.value)}
-                      />
-                      <Input
-                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
-                        placeholder="London"
-                        value={form.homeAddress[2]}
-                        onChange={(e) => handleAddressInput(2, e.target.value)}
-                      />
-                      <Input
-                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
-                        placeholder="England"
-                        value={form.homeAddress[3]}
-                        onChange={(e) => handleAddressInput(3, e.target.value)}
-                      />
+                      {[0, 1, 2, 3].map((addressLineIndex) => {
+                        const lineValue = form.homeAddress[addressLineIndex] ?? "";
+                        const hasStreet =
+                          Boolean(form.homeAddress[0]?.trim()) ||
+                          Boolean(form.homeAddress[1]?.trim());
+                        const isStreetLine =
+                          addressLineIndex === 0 || addressLineIndex === 1;
+                        const shouldHighlightEmpty =
+                          Boolean(validationErrors.homeAddress) &&
+                          ((isStreetLine && !hasStreet && !lineValue.trim()) ||
+                            (addressLineIndex === 2 && !lineValue.trim()) ||
+                            (addressLineIndex === 3 && !lineValue.trim()));
+                        const placeholders = [
+                          "45",
+                          "Macaulay Road",
+                          "London",
+                          "England",
+                        ] as const;
+
+                        return (
+                          <Input
+                            key={`home-address-${addressLineIndex}`}
+                            className={`h-[35px] rounded-lg border border-solid bg-white shadow-shadow-xs ${
+                              shouldHighlightEmpty
+                                ? "border-red-500"
+                                : "border-[#cfd4dc]"
+                            }`}
+                            placeholder={placeholders[addressLineIndex]}
+                            value={lineValue}
+                            onChange={(e) =>
+                              handleAddressInput(addressLineIndex, e.target.value)
+                            }
+                          />
+                        );
+                      })}
                     </div>
                   </div>
+                  {validationErrors.homeAddress && (
+                    <p className="text-sm text-red-500 mt-2">
+                      {validationErrors.homeAddress[0]}
+                    </p>
+                  )}
                 </div>
               )}
 

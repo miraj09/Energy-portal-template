@@ -28,6 +28,8 @@ export default function DateRangePicker({
   ]);
   const [selectedRangeText, setSelectedRangeText] = useState<string>(""); // Initially empty
   const pickerRef = useRef<HTMLDivElement>(null);
+  /** First calendar click sets start; second click commits the range (including same-day). */
+  const isSelectingEndDate = useRef(false);
 
   const handleSelect = (ranges: RangeKeyDict) => {
     const selection = ranges.selection;
@@ -39,14 +41,16 @@ export default function DateRangePicker({
       selection.endDate,
       "dd/MM/yyyy"
     )}`;
-    setSelectedRangeText(formatted); // Set visual text
+    setSelectedRangeText(formatted);
 
-    // Only close the picker and trigger onChange when both dates are different
-    // This ensures picker stays open while selecting the range
-    if (selection.startDate.getTime() !== selection.endDate.getTime()) {
-      onRangeChange(formatted, selection.startDate, selection.endDate);
-      setShowPicker(false);
+    if (!isSelectingEndDate.current) {
+      isSelectingEndDate.current = true;
+      return;
     }
+
+    onRangeChange(formatted, selection.startDate, selection.endDate);
+    setShowPicker(false);
+    isSelectingEndDate.current = false;
   };
 
   const handleClear = () => {
@@ -59,6 +63,7 @@ export default function DateRangePicker({
       },
     ]);
     setSelectedRangeText("");
+    isSelectingEndDate.current = false;
     // Signal clear to parent via empty formatted string
     onRangeChange("", today, today);
     setShowPicker(false);
@@ -90,7 +95,13 @@ export default function DateRangePicker({
         readOnly
         value={selectedRangeText}
         placeholder="Select date range"
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={() => {
+          const nextOpen = !showPicker;
+          setShowPicker(nextOpen);
+          if (nextOpen) {
+            isSelectingEndDate.current = false;
+          }
+        }}
         className="w-full text-sm text-[#737373] pl-3 pr-10 py-2 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer placeholder:text-gray-400"
       />
       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 pointer-events-none">

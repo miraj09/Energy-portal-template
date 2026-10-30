@@ -254,12 +254,17 @@ const SoldTariffForm = () => {
         errors.homeLocation = ["Home location is required"];
         isValid = false;
       }
-      // Allow empty premises when API doesn't return it; only require lines 2-4
-      const homeAddrMissing = [1, 2, 3].some(
-        (i) => !form.homeAddress[i] || !form.homeAddress[i].trim(),
-      );
-      if (homeAddrMissing) {
-        errors.homeAddress = ["All home address fields are required"];
+      // Street may land in premises [0] and/or address_line_1 [1] depending on the API.
+      // Require a street line, locality, and postcode — don't fail when one street slot is blank.
+      const hasHomeStreet =
+        Boolean(form.homeAddress[0]?.trim()) ||
+        Boolean(form.homeAddress[1]?.trim());
+      const hasHomeLocality = Boolean(form.homeAddress[2]?.trim());
+      const hasHomePostalCode = Boolean(form.homeAddress[3]?.trim());
+      if (!hasHomeStreet || !hasHomeLocality || !hasHomePostalCode) {
+        errors.homeAddress = [
+          "Please complete the home address (street, town/city, and postcode)",
+        ];
         isValid = false;
       }
 
@@ -386,6 +391,13 @@ const SoldTariffForm = () => {
         string,
       ],
     }));
+    if (validationErrors.homeAddress) {
+      setValidationErrors((prev) => {
+        const nextErrors = { ...prev };
+        delete nextErrors.homeAddress;
+        return nextErrors;
+      });
+    }
   };
 
   const handleCancel = () => {

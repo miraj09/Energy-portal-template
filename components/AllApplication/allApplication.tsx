@@ -28,10 +28,22 @@ const AllApplicationTable = () => {
     mpanMprn: "",
     postcode: "",
     businessName: "",
+    /** Pending API date filters (yyyy-MM-dd), applied on "Apply Filters". */
+    dateFrom: "",
+    dateTo: "",
   });
+  /** Bump to remount DateRangePicker so Clear resets its internal display. */
+  const [dateRangeResetKey, setDateRangeResetKey] = useState(0);
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
     {}
   );
+
+  const toApiDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
   const currentState = getInstanceState("all-application-table");
@@ -120,6 +132,27 @@ const AllApplicationTable = () => {
     }));
   };
 
+  const handleDateRangeChange = (
+    formattedRange: string,
+    startDate: Date,
+    endDate: Date
+  ) => {
+    if (!formattedRange) {
+      setAdvancedFilterInputs((prev) => ({
+        ...prev,
+        dateFrom: "",
+        dateTo: "",
+      }));
+      return;
+    }
+
+    setAdvancedFilterInputs((prev) => ({
+      ...prev,
+      dateFrom: toApiDate(startDate),
+      dateTo: toApiDate(endDate),
+    }));
+  };
+
   const handleApplyAdvancedFilters = () => {
     setFilters((prevFilters) => {
       const nextFilters: TableFilters = { ...prevFilters };
@@ -127,10 +160,15 @@ const AllApplicationTable = () => {
       const trimmedMpan = advancedFilterInputs.mpanMprn.trim();
       const trimmedPostcode = advancedFilterInputs.postcode.trim();
       const trimmedBusinessName = advancedFilterInputs.businessName.trim();
+      const trimmedDateFrom = advancedFilterInputs.dateFrom.trim();
+      const trimmedDateTo = advancedFilterInputs.dateTo.trim();
 
       nextFilters.quote_mpan_mrpn_text = trimmedMpan || undefined;
       nextFilters.current_postcode = trimmedPostcode || undefined;
       nextFilters.company_name = trimmedBusinessName || undefined;
+      // django-filter DateFromToRangeFilter on created_at
+      nextFilters.created_at_after = trimmedDateFrom || undefined;
+      nextFilters.created_at_before = trimmedDateTo || undefined;
 
       return nextFilters;
     });
@@ -142,17 +180,24 @@ const AllApplicationTable = () => {
       mpanMprn: "",
       postcode: "",
       businessName: "",
+      dateFrom: "",
+      dateTo: "",
     });
+    setDateRangeResetKey((previousKey) => previousKey + 1);
     setFilters((prevFilters) => {
       const {
         quote_mpan_mrpn_text,
         current_postcode,
         company_name,
+        created_at_after,
+        created_at_before,
         ...rest
       } = prevFilters;
       void quote_mpan_mrpn_text;
       void current_postcode;
       void company_name;
+      void created_at_after;
+      void created_at_before;
       return rest;
     });
     setCurrentPage(1);
@@ -255,9 +300,8 @@ const AllApplicationTable = () => {
                 Date Range
               </label>
               <DateRangePicker
-                onRangeChange={(formattedRange, startDate, endDate) =>
-                  console.log("Date range:", formattedRange, startDate, endDate)
-                }
+                key={dateRangeResetKey}
+                onRangeChange={handleDateRangeChange}
               />
             </div>
             <div className="flex flex-col justify-end gap-2 md:flex-row md:items-end md:justify-end md:col-span-2 lg:col-span-4">
