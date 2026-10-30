@@ -17,6 +17,7 @@ const PATH_LABEL_MAPPINGS: Record<string, string> = {
   "export-contract": "Export Contract",
   "reports": "Reports",
   "tickets": "Tickets",
+  "website-enquiries": "Website Enquiries",
   "docusign": "DocuSign",
   "tpi-document": "TPI Document",
   "invoices": "Invoices",

@@ -12,7 +12,10 @@ import {
   TableRow,
 } from "@/ui";
 import { Site, Meter } from "../types";
-import { buildMeterReferenceForDisplay } from "@/composable/meterQuoteForm";
+import {
+  buildMeterReferenceForDisplay,
+  resolveMeterDisplayRates,
+} from "@/composable/meterQuoteForm";
 
 interface SubmittedContactsModalProps {
   isOpen: boolean;
@@ -79,6 +82,9 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                   <div className="p-4 space-y-6">
                     {meters.map((m) => {
                       const ref = buildMeterReferenceForDisplay(m);
+                      const rates = resolveMeterDisplayRates(m);
+                      const showRate = (value: string) =>
+                        value && value !== "N/A" ? value : "-";
                       return (
                         <div key={m.meterid} className="border rounded">
                           <div className="grid grid-cols-1 md:grid-cols-1 gap-4 p-4">
@@ -138,7 +144,9 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                   <div className="text-[#737373]">
                                     Start Date
                                   </div>
-                                  <div className="text-black">-</div>
+                                  <div className="text-black">
+                                    {rates.startDate || "-"}
+                                  </div>
                                 </div>
                                 <div>
                                   <div className="text-[#737373]">End Date</div>
@@ -167,9 +175,11 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                 <div>
                                   <div className="text-[#737373]">Units</div>
                                   <div className="text-black">
-                                    {m.meter_type_name === "Electricity"
-                                      ? "kWh"
-                                      : "-"}
+                                    {rates.dayKwh
+                                      ? `${rates.dayKwh} kWh`
+                                      : m.meter_type_name === "Electricity"
+                                        ? "kWh"
+                                        : "-"}
                                   </div>
                                 </div>
                                 <div>
@@ -238,22 +248,22 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                   <TableBody>
                                     <TableRow>
                                       <TableCell className="py-2 px-3">
-                                        {m.latestSoldStandingCharge || "-"}
+                                        {showRate(rates.standingCharge)}
                                       </TableCell>
                                       <TableCell className="py-2 px-3">
                                         {m.latestterm ?? "-"}
                                       </TableCell>
                                       <TableCell className="py-2 px-3">
-                                        {m.latestSoldDayRate || "-"}
+                                        {showRate(rates.dayRate)}
                                       </TableCell>
                                       <TableCell className="py-2 px-3">
-                                        {m.latestSoldNightRate || "-"}
+                                        {showRate(rates.nightRate)}
                                       </TableCell>
                                       <TableCell className="py-2 px-3">
-                                        {m.latestSoldEveningWeekendRate || "-"}
+                                        {showRate(rates.eveningWeekendRate)}
                                       </TableCell>
                                       <TableCell className="py-2 px-3">
-                                        {m.latestSoldWinterRate || "-"}
+                                        {showRate(rates.winterRate)}
                                       </TableCell>
                                     </TableRow>
                                   </TableBody>

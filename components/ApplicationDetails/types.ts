@@ -131,7 +131,7 @@ export interface PrimaryContactDetails {
 
 /** Flat quote fields nested under sites[].meters[].quote */
 export interface QuoteHeaderFlat {
-  id: number;
+  id?: number;
   profileclass?: string | null;
   MTC?: string | null;
   LLF?: string | null;
@@ -141,16 +141,17 @@ export interface QuoteHeaderFlat {
   is_mpan?: boolean;
   is_mrpn?: boolean;
   Number_of_Days?: number | null;
-  standing_charge?: string | null;
-  day_rate?: string | null;
-  day_kwh?: string | null;
-  night_rate?: string | null;
-  night_kwh?: string | null;
-  ew_rate?: string | null;
-  ew_kwh?: string | null;
-  winter_rate?: string | null;
-  winter_kwh?: string | null;
-  aq_eac?: string | null;
+  Contract_Start_Date?: string | null;
+  standing_charge?: string | number | null;
+  day_rate?: string | number | null;
+  day_kwh?: string | number | null;
+  night_rate?: string | number | null;
+  night_kwh?: string | number | null;
+  ew_rate?: string | number | null;
+  ew_kwh?: string | number | null;
+  winter_rate?: string | number | null;
+  winter_kwh?: string | number | null;
+  aq_eac?: string | number | null;
 }
 
 export interface SiteMeter extends Meter {
@@ -356,4 +357,10 @@ export interface CompanyApiResponse {
   // Optional DocuSign envelope identifier if an e-sign envelope already exists
   loa_envelope_id?: string | null;
   is_submitted?: boolean;
+  /**
+   * Quote header linked when the company was created from sold-tariff.
+   * May arrive as a bare id or a nested `{ id }` object.
+   */
+  quote?: number | { id: number } | null;
+  quote_id?: number | null;
 }

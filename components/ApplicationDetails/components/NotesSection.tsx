@@ -103,7 +103,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           <div className="space-y-4">
             <label
               htmlFor="add-note"
-              className="text-sm text-[#363636] font-['Inter']"
+              className="text-sm text-[#363636] font-['Arial',Helvetica,sans-serif]"
             >
               Add Note
             </label>
@@ -146,9 +146,9 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           // Show scrollable notes section when notes exist
           <Card className="w-full shadow-md py-4">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3 sm:gap-0">
-              <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Plus_Jakarta_Sans',Helvetica]">
+              <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
                 Notes
-                <span className="text-sm text-[#737373] font-['Inter']">
+                <span className="text-sm text-[#737373] font-['Arial',Helvetica,sans-serif]">
                   (View)
                 </span>
               </CardTitle>
@@ -175,7 +175,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                                 note.id === 2
                                   ? "text-sm sm:text-lg leading-[18px] sm:leading-[25px]"
                                   : "text-sm sm:text-lg leading-[18px] sm:leading-5"
-                              } [font-family:'Inter',Helvetica] hidden`}
+                              } font-['Arial',Helvetica,sans-serif] hidden`}
                             >
                               {note.author}
                             </h3>
@@ -184,13 +184,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                                 note.id === 2
                                   ? "text-sm sm:text-lg leading-[18px] sm:leading-[25px]"
                                   : "text-sm sm:text-lg leading-[18px] sm:leading-5"
-                              } [font-family:'Inter',Helvetica] `}
+                              } font-['Arial',Helvetica,sans-serif] `}
                             >
                               {note.timestamp}
                             </h3>
                           </div>
                           <div
-                            className={`text-xs text-black [font-family:'Inter',Helvetica] mt-2 sm:mt-4 break-words leading-relaxed`}
+                            className={`text-xs text-black font-['Arial',Helvetica,sans-serif] mt-2 sm:mt-4 break-words leading-relaxed`}
                           >
                             {note.content}
                           </div>
@@ -202,7 +202,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                               alt="Line"
                               src="/line-7.svg"
                             /> */}
-                            <span className="ml-[8px] text-[12px] font-semibold text-neutral-500 [font-family:'Inter',Helvetica] hidden">
+                            <span className="ml-[8px] text-[12px] font-semibold text-neutral-500 font-['Arial',Helvetica,sans-serif] hidden">
                               {note.timestamp}
                             </span>
                           </div>
@@ -218,7 +218,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
               <div className="px-3 sm:px-5 py-2">
                 <label
                   htmlFor="add-note"
-                  className="text-sm text-[#363636] font-['Inter']"
+                  className="text-sm text-[#363636] font-['Arial',Helvetica,sans-serif]"
                 >
                   Add Note
                 </label>

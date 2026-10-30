@@ -1,4 +1,8 @@
 import type { RoleSummary, UserRecord } from "@/lib/types/user";
+import {
+  AGENT_ROLE_NAMES,
+  SUB_AGENT_ROLE_NAMES,
+} from "@/lib/constants/roles";
 
 type TokenRole =
   | RoleSummary
@@ -132,3 +136,15 @@ export function userHasAnyRole(
     return Boolean(normalizedRoleName && normalizedAllowedRoles.has(normalizedRoleName));
   });
 }
+
+/**
+ * True for Sub-agent users who are not also Agents.
+ * Used to block user-creation and similar Agent-only actions.
+ */
+export function isSubAgentUser(user: UserRecord | null | undefined): boolean {
+  return (
+    userHasAnyRole(user, SUB_AGENT_ROLE_NAMES) &&
+    !userHasAnyRole(user, AGENT_ROLE_NAMES)
+  );
+}
+

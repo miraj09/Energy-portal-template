@@ -7,29 +7,75 @@ import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import { CalendarRange } from "lucide-react";
 
+/** A completed date range as reported by / passed into the picker. */
+export interface SelectedDateRange {
+  startDate: Date;
+  endDate: Date;
+}
+
 interface DateRangePickerProps {
   onRangeChange: (
     formattedRange: string,
     startDate: Date,
     endDate: Date
   ) => void;
+  /**
+   * Optional controlled value.
+   * - Omit it and the picker manages its own state (legacy behaviour).
+   * - Pass a range to show it, or `null` to reset the picker to empty — this is
+   *   how a parent-level "Clear" button can wipe the displayed text.
+   */
+  value?: SelectedDateRange | null;
 }
+
+/** Text shown in the read-only input once a full range has been picked. */
+const formatRangeText = (startDate: Date, endDate: Date): string =>
+  `${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`;
+
+/** Shape `react-date-range` expects for its `ranges` prop. */
+const buildCalendarRange = (startDate: Date, endDate: Date): Range[] => [
+  { startDate, endDate, key: "selection" },
+];
 
 export default function DateRangePicker({
   onRangeChange,
+  value,
 }: DateRangePickerProps) {
   const [showPicker, setShowPicker] = useState(false);
-  const [range, setRange] = useState<Range[]>([
-    {
-      startDate: new Date(),
-      endDate: new Date(),
-      key: "selection",
-    },
-  ]);
-  const [selectedRangeText, setSelectedRangeText] = useState<string>(""); // Initially empty
+  // Seed from the controlled value when given so there is no empty→filled flash on mount
+  const [range, setRange] = useState<Range[]>(() =>
+    value
+      ? buildCalendarRange(value.startDate, value.endDate)
+      : buildCalendarRange(new Date(), new Date())
+  );
+  const [selectedRangeText, setSelectedRangeText] = useState<string>(() =>
+    value ? formatRangeText(value.startDate, value.endDate) : ""
+  );
   const pickerRef = useRef<HTMLDivElement>(null);
-  /** First calendar click sets start; second click commits the range (including same-day). */
-  const isSelectingEndDate = useRef(false);
+
+  // Keep internal display state in sync with the controlled `value` prop.
+  // Depending on timestamps (not the object) means a parent re-render that passes
+  // a structurally-equal range does not wipe an in-progress selection.
+  const isControlled = value !== undefined;
+  const controlledStartTime = value?.startDate.getTime();
+  const controlledEndTime = value?.endDate.getTime();
+
+  useEffect(() => {
+    if (!isControlled) return;
+
+    if (controlledStartTime === undefined || controlledEndTime === undefined) {
+      // Parent cleared the range (value === null)
+      const today = new Date();
+      setRange(buildCalendarRange(today, today));
+      setSelectedRangeText("");
+      return;
+    }
+
+    const startDate = new Date(controlledStartTime);
+    const endDate = new Date(controlledEndTime);
+    setRange(buildCalendarRange(startDate, endDate));
+    setSelectedRangeText(formatRangeText(startDate, endDate));
+  }, [isControlled, controlledStartTime, controlledEndTime]);
 
   const handleSelect = (ranges: RangeKeyDict) => {
     const selection = ranges.selection;
@@ -37,33 +83,21 @@ export default function DateRangePicker({
 
     setRange([selection]);
 
-    const formatted = `${format(selection.startDate, "dd/MM/yyyy")} - ${format(
-      selection.endDate,
-      "dd/MM/yyyy"
-    )}`;
-    setSelectedRangeText(formatted);
+    const formatted = formatRangeText(selection.startDate, selection.endDate);
+    setSelectedRangeText(formatted); // Set visual text
 
-    if (!isSelectingEndDate.current) {
-      isSelectingEndDate.current = true;
-      return;
+    // Only close the picker and trigger onChange when both dates are different
+    // This ensures picker stays open while selecting the range
+    if (selection.startDate.getTime() !== selection.endDate.getTime()) {
+      onRangeChange(formatted, selection.startDate, selection.endDate);
+      setShowPicker(false);
     }
-
-    onRangeChange(formatted, selection.startDate, selection.endDate);
-    setShowPicker(false);
-    isSelectingEndDate.current = false;
   };
 
   const handleClear = () => {
     const today = new Date();
-    setRange([
-      {
-        startDate: today,
-        endDate: today,
-        key: "selection",
-      },
-    ]);
+    setRange(buildCalendarRange(today, today));
     setSelectedRangeText("");
-    isSelectingEndDate.current = false;
     // Signal clear to parent via empty formatted string
     onRangeChange("", today, today);
     setShowPicker(false);
@@ -95,13 +129,7 @@ export default function DateRangePicker({
         readOnly
         value={selectedRangeText}
         placeholder="Select date range"
-        onClick={() => {
-          const nextOpen = !showPicker;
-          setShowPicker(nextOpen);
-          if (nextOpen) {
-            isSelectingEndDate.current = false;
-          }
-        }}
+        onClick={() => setShowPicker(!showPicker)}
         className="w-full text-sm text-[#737373] pl-3 pr-10 py-2 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer placeholder:text-gray-400"
       />
       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 pointer-events-none">

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   TableHeader,
@@ -15,9 +15,33 @@ import TableHeaderComponent from "@/components/TableHeader";
 import { useMultipleTableHeaders } from "@/hooks/useTableHeaderState";
 import { getCompanyList, type TableFilters } from "@/composable/getTableData";
 import Link from "next/link";
-import DateRangePicker from "@/ui/dateRangePicker";
+import DateRangePicker, { type SelectedDateRange } from "@/ui/dateRangePicker";
+import { format } from "date-fns";
 import { Application } from "./type";
 import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
+import { useAgentUserIdParam } from "@/hooks/useAgentUserIdParam";
+
+/**
+ * Query-param names the company list API expects for the "Created Date" range.
+ * Kept in one place so renaming to match the backend is a one-line change.
+ * TODO(backend): confirm these names with the `/core/company/` filterset.
+ */
+const CREATED_DATE_FILTER_PARAMS = {
+  from: "created_at__gte",
+  to: "created_at__lte",
+} as const;
+
+/** Calendar-date format sent to the API (no time component). */
+const API_DATE_FORMAT = "yyyy-MM-dd";
+
+/** Every filter key owned by the advanced-filter panel; removed together on "Clear". */
+const ADVANCED_FILTER_PARAM_KEYS = [
+  "quote_mpan_mrpn_text",
+  "current_postcode",
+  "company_name",
+  CREATED_DATE_FILTER_PARAMS.from,
+  CREATED_DATE_FILTER_PARAMS.to,
+] as const;
 
 const AllApplicationTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,25 +52,24 @@ const AllApplicationTable = () => {
     mpanMprn: "",
     postcode: "",
     businessName: "",
-    /** Pending API date filters (yyyy-MM-dd), applied on "Apply Filters". */
-    dateFrom: "",
-    dateTo: "",
   });
-  /** Bump to remount DateRangePicker so Clear resets its internal display. */
-  const [dateRangeResetKey, setDateRangeResetKey] = useState(0);
+  // Draft date range picked in the panel; like the text inputs it is only sent
+  // to the API once "Apply Filters" is clicked.
+  const [selectedDateRange, setSelectedDateRange] =
+    useState<SelectedDateRange | null>(null);
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
     {}
   );
 
-  const toApiDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
   const currentState = getInstanceState("all-application-table");
+  const { agentUserIdFilter, isReady: isAgentUserIdReady } =
+    useAgentUserIdParam();
+
+  const queryFilters = useMemo(
+    () => ({ ...filters, ...agentUserIdFilter }),
+    [filters, agentUserIdFilter]
+  );
 
   const {
     results: companies,
@@ -54,14 +77,15 @@ const AllApplicationTable = () => {
     isLoading,
   } = usePaginatedTableQuery<Application>({
     resource: "all-applications",
-    fetcher: (queryFilters) =>
-      getCompanyList(queryFilters) as Promise<
+    fetcher: (queryFiltersArg) =>
+      getCompanyList(queryFiltersArg) as Promise<
         import("@/composable/getTableData").TableDataResult<Application>
       >,
     page: currentPage,
     pageSize: itemsPerPage,
     search: searchTerm,
-    filters,
+    filters: queryFilters,
+    enabled: isAgentUserIdReady,
   });
 
   const formatCompanyDates = useCallback(async (companyList: Application[]) => {
@@ -132,25 +156,16 @@ const AllApplicationTable = () => {
     }));
   };
 
+  /**
+   * The picker reports an empty `formattedRange` when its own inline "Clear"
+   * link is used, so treat that as "no range selected".
+   */
   const handleDateRangeChange = (
     formattedRange: string,
     startDate: Date,
     endDate: Date
   ) => {
-    if (!formattedRange) {
-      setAdvancedFilterInputs((prev) => ({
-        ...prev,
-        dateFrom: "",
-        dateTo: "",
-      }));
-      return;
-    }
-
-    setAdvancedFilterInputs((prev) => ({
-      ...prev,
-      dateFrom: toApiDate(startDate),
-      dateTo: toApiDate(endDate),
-    }));
+    setSelectedDateRange(formattedRange ? { startDate, endDate } : null);
   };
 
   const handleApplyAdvancedFilters = () => {
@@ -160,15 +175,19 @@ const AllApplicationTable = () => {
       const trimmedMpan = advancedFilterInputs.mpanMprn.trim();
       const trimmedPostcode = advancedFilterInputs.postcode.trim();
       const trimmedBusinessName = advancedFilterInputs.businessName.trim();
-      const trimmedDateFrom = advancedFilterInputs.dateFrom.trim();
-      const trimmedDateTo = advancedFilterInputs.dateTo.trim();
 
       nextFilters.quote_mpan_mrpn_text = trimmedMpan || undefined;
       nextFilters.current_postcode = trimmedPostcode || undefined;
       nextFilters.company_name = trimmedBusinessName || undefined;
-      // django-filter DateFromToRangeFilter on created_at
-      nextFilters.created_at_after = trimmedDateFrom || undefined;
-      nextFilters.created_at_before = trimmedDateTo || undefined;
+
+      // `undefined` values are dropped by getTableData, so an unset range
+      // simply omits both params from the request.
+      nextFilters[CREATED_DATE_FILTER_PARAMS.from] = selectedDateRange
+        ? format(selectedDateRange.startDate, API_DATE_FORMAT)
+        : undefined;
+      nextFilters[CREATED_DATE_FILTER_PARAMS.to] = selectedDateRange
+        ? format(selectedDateRange.endDate, API_DATE_FORMAT)
+        : undefined;
 
       return nextFilters;
     });
@@ -180,25 +199,15 @@ const AllApplicationTable = () => {
       mpanMprn: "",
       postcode: "",
       businessName: "",
-      dateFrom: "",
-      dateTo: "",
     });
-    setDateRangeResetKey((previousKey) => previousKey + 1);
+    // Passing `null` down as the controlled value resets the picker's text
+    setSelectedDateRange(null);
     setFilters((prevFilters) => {
-      const {
-        quote_mpan_mrpn_text,
-        current_postcode,
-        company_name,
-        created_at_after,
-        created_at_before,
-        ...rest
-      } = prevFilters;
-      void quote_mpan_mrpn_text;
-      void current_postcode;
-      void company_name;
-      void created_at_after;
-      void created_at_before;
-      return rest;
+      const remainingFilters: TableFilters = { ...prevFilters };
+      ADVANCED_FILTER_PARAM_KEYS.forEach((filterKey) => {
+        delete remainingFilters[filterKey];
+      });
+      return remainingFilters;
     });
     setCurrentPage(1);
   };
@@ -295,15 +304,15 @@ const AllApplicationTable = () => {
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <div className="flex flex-col">
+            {/* <div className="flex flex-col">
               <label className="text-sm font-medium text-gray-700 mb-1">
                 Date Range
               </label>
               <DateRangePicker
-                key={dateRangeResetKey}
+                value={selectedDateRange}
                 onRangeChange={handleDateRangeChange}
               />
-            </div>
+            </div> */}
             <div className="flex flex-col justify-end gap-2 md:flex-row md:items-end md:justify-end md:col-span-2 lg:col-span-4">
               <button
                 onClick={handleApplyAdvancedFilters}
@@ -351,7 +360,9 @@ const AllApplicationTable = () => {
                     <TableCell>
                       <Link href={`/all-applications/${company.id}`}>
                         <InfoButton>
-                          {company.id?.split("-")[0] ?? "N/A"}
+                          {company.lead_id != null && company.lead_id !== ""
+                            ? String(company.lead_id)
+                            : "N/A"}
                         </InfoButton>
                       </Link>
                     </TableCell>

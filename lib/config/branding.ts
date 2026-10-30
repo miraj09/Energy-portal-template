@@ -1,20 +1,29 @@
 /**
  * Central branding configuration for the template.
- * Replace these values when customizing for a specific company.
+ *
+ * All values below are FICTIONAL placeholders ("Acme Energy") and are not
+ * real company data. Replace them when customizing for a specific company.
  * Keep logos under /public and point logoSrc at the file path.
  */
 export const branding = {
-  appName: "Energy Portal",
-  appDescription: "Energy management portal template",
+  /** Browser tab title and <meta> description. */
+  appName: "Acme Energy Portal",
+  appDescription: "Energy sales and account management portal",
+
+  /** Logo shown in the sidebar, header and public auth pages. */
   logoSrc: "/placeholder-logo.svg",
-  logoAlt: "Company logo",
-  companyName: "YOUR COMPANY LIMITED",
-  companyEmail: "payments@example.com",
-  /** Invoice "Bill To" / letterhead placeholders — not real company data. */
-  addressLine1: "Address line 1",
-  addressLine2: "Address line 2",
-  city: "City",
-  postCode: "POST CODE",
-  companyNumber: "00000000",
-  vatNumber: "000 0000 00",
+  logoAlt: "Acme Energy logo",
+
+  /** Public-facing portal name (used in the public page footer). */
+  portalName: "Acme Energy Portal",
+
+  /** Legal entity details used in the invoice "Bill To" block and footer. */
+  companyName: "ACME ENERGY LIMITED",
+  addressLine1: "1 Example Street",
+  addressLine2: "Example Park",
+  city: "London",
+  postCode: "EC1A 1AA",
+  companyNumber: "12345678",
+  vatNumber: "GB 123 4567 89",
+  companyEmail: "billing@acme-energy.example",
 } as const;

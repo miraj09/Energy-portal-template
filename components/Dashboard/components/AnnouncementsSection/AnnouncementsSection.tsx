@@ -46,7 +46,7 @@ export const AnnouncementsSection = ({
   return (
     <Card className="w-full shadow-md">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3 sm:gap-0">
-        <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Plus_Jakarta_Sans',Helvetica]">
+        <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
           Announcements
         </CardTitle>
         <Button
@@ -71,19 +71,19 @@ export const AnnouncementsSection = ({
                 <div className="p-2 sm:p-2.5">
                   <div className="flex flex-col gap-2 sm:gap-0">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                      <h3 className="font-semibold text-black break-words text-sm sm:text-lg leading-[18px] sm:leading-5 [font-family:'Inter',Helvetica]">
+                      <h3 className="font-semibold text-black break-words text-sm sm:text-lg leading-[18px] sm:leading-5 font-['Arial',Helvetica,sans-serif]">
                         {announcement.subject}
                       </h3>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 self-start sm:self-auto">
-                        <span className="text-xs sm:text-sm text-primary font-medium bg-primary/10 px-2 py-1 rounded-md [font-family:'Inter',Helvetica]">
+                        <span className="text-xs sm:text-sm text-primary font-medium bg-primary/10 px-2 py-1 rounded-md font-['Arial',Helvetica,sans-serif]">
                           {announcement.category}
                         </span>
-                        <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] [font-family:'Inter',Helvetica] whitespace-nowrap">
+                        <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] font-['Arial',Helvetica,sans-serif] whitespace-nowrap">
                           {formatDate(announcement.created_at)}
                         </span>
                       </div>
                     </div>
-                    <div className="text-xs text-black [font-family:'Inter',Helvetica] mt-2 sm:mt-4 break-words leading-relaxed">
+                    <div className="text-xs text-black font-['Arial',Helvetica,sans-serif] mt-2 sm:mt-4 break-words leading-relaxed">
                       {parseMessage(announcement.message)}
                     </div>
                   </div>

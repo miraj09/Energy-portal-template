@@ -25,6 +25,7 @@ import { Company, SubmittedSale } from "@/components/ExportContractTable/type";
 import { formatDateTimeWithSeconds } from "@/composable/getFormatedDate";
 import Link from "next/link";
 import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
+import { useAgentUserIdParam } from "@/hooks/useAgentUserIdParam";
 
 /** Lazy-load date picker — pulls react-date-range CSS/JS only when this page mounts. */
 const DateRangePicker = dynamic(() => import("@/ui/dateRangePicker"), {
@@ -43,8 +44,12 @@ type SubmittedSalesRecord = Omit<SubmittedSale, "company"> & {
 /** Flat row ready for the table — avoids re-walking nested company_detail on every render. */
 type SubmittedSalesDisplayRow = {
   id: string | number | null;
+  /** Submitted-sale id used for details route (`/submitted-sales/{id}`). */
   hrefId: string | number | null;
-  companyIdLabel: string;
+  /** Company id kept for API payloads; not shown as the ID column label. */
+  companyId: string | null;
+  /** Visible ID column label — lead id (not company id). */
+  leadIdLabel: string;
   companyName: string;
   address: string;
   fuelType: string;
@@ -68,9 +73,9 @@ const toDisplayString = (value: unknown): string => {
 function mapRecordToDisplayRow(
   record: SubmittedSalesRecord
 ): SubmittedSalesDisplayRow {
-  const companyId = record.company_detail?.id ?? record.company?.id;
-  const companyIdLabel =
-    companyId == null ? "N/A" : (String(companyId).split("-")[0] ?? "N/A");
+  const rawCompanyId = record.company_detail?.id ?? record.company?.id;
+  const companyId =
+    rawCompanyId == null ? null : String(rawCompanyId);
 
   const detail = record.company_detail;
   const address = detail
@@ -99,13 +104,15 @@ function mapRecordToDisplayRow(
   }
 
   const bottomlineValue = getBottomlineFromCompanyDetail(record.company_detail);
-  const lead = record.lead_id != null ? String(record.lead_id) : "N/A";
+  const leadIdLabel =
+    record.lead_id != null ? String(record.lead_id) : "N/A";
   const ref = record.reference ?? "N/A";
 
   return {
     id: record.id ?? null,
     hrefId: record.id ?? null,
-    companyIdLabel,
+    companyId,
+    leadIdLabel,
     companyName: record.company_detail?.company_name ?? "",
     address,
     fuelType: toDisplayString(record.company_detail?.contract_type),
@@ -125,7 +132,7 @@ function mapRecordToDisplayRow(
         record.company?.created_at ??
         null
     ),
-    subtitle: [lead, ref].filter(Boolean).join(" - "),
+    subtitle: [leadIdLabel, ref].filter(Boolean).join(" - "),
   };
 }
 
@@ -147,6 +154,13 @@ const SubmittedSalesTable = () => {
 
   const { getInstanceState, updateInstanceState } = useMultipleTableHeaders();
   const currentState = getInstanceState("submitted-sales-table");
+  const { agentUserIdFilter, isReady: isAgentUserIdReady } =
+    useAgentUserIdParam();
+
+  const queryFilters = useMemo(
+    () => ({ ...filters, ...agentUserIdFilter }),
+    [filters, agentUserIdFilter]
+  );
 
   const {
     results: sales,
@@ -159,7 +173,8 @@ const SubmittedSalesTable = () => {
     page: currentPage,
     pageSize: itemsPerPage,
     search: searchTerm,
-    filters,
+    filters: queryFilters,
+    enabled: isAgentUserIdReady,
   });
 
   // Map nested API rows once when results change — not on every keystroke/re-render.
@@ -369,10 +384,10 @@ const SubmittedSalesTable = () => {
                     <TableCell>
                       {row.hrefId != null ? (
                         <Link href={`/submitted-sales/${row.hrefId}`}>
-                          <InfoButton>{row.companyIdLabel}</InfoButton>
+                          <InfoButton>{row.leadIdLabel}</InfoButton>
                         </Link>
                       ) : (
-                        row.companyIdLabel
+                        row.leadIdLabel
                       )}
                     </TableCell>
                     <TableCell>{row.companyName}</TableCell>

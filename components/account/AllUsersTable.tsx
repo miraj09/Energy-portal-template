@@ -8,29 +8,51 @@ import TableActions from "@/components/ui/TableActions";
 import ViewUserModal from "@/components/account/ViewUserModal";
 import EditUserModal from "@/components/account/EditUserModal";
 import { deleteUser } from "@/lib/actions/deleteUser";
-import type { UserRecord } from "@/lib/types/user";
+import type { ParentAgentOption, UserRecord } from "@/lib/types/user";
 import { Input } from "@/ui/input";
+import { isSubAgentUser } from "@/lib/user/mapLoginUserData";
+
+const USER_STORAGE_KEY = "energy_user_Data";
 
 type AllUsersTableProps = {
   users: UserRecord[];
   tableTitle?: string;
   searchQuery?: string;
   rolesData: Array<{ id: number; name: string }>;
+  parentAgentOptions?: ParentAgentOption[];
 };
+
+function readCurrentUserFromStorage(): UserRecord | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as UserRecord;
+  } catch {
+    return null;
+  }
+}
 
 export default function AllUsersTable({
   users = [],
   tableTitle = "All Users",
   searchQuery = "",
   rolesData = [],
+  parentAgentOptions = [],
 }: AllUsersTableProps) {
   const [search, setSearch] = useState(searchQuery);
+  // Hidden until role is known so Sub-agents never see a flash of Add User.
+  const [canAddUser, setCanAddUser] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    setCanAddUser(!isSubAgentUser(readCurrentUserFromStorage()));
+  }, []);
 
   const handleSearchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,18 +79,22 @@ export default function AllUsersTable({
               Search
             </button>
           </form>
-          <button
-            onClick={() => router.push("/users/add-user")}
-            className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground"
-          >
-            Add User
-          </button>
+          {canAddUser ? (
+            <button
+              onClick={() => router.push("/users/add-user")}
+              className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground"
+            >
+              Add User
+            </button>
+          ) : null}
         </div>
       </div>
 
       <div className="account-card overflow-auto rounded-md">
         <table className="min-w-full divide-y divide-gray-200 text-sm text-left">
-          <TableHead heads={["Actions", "User ID", "Name", "Email", "Phone", "Roles", "Status"]} />
+          <TableHead
+            heads={["Actions", "User ID", "Name", "Email", "Phone", "Roles", "Reports To", "Status"]}
+          />
           <tbody className="divide-y divide-gray-100 text-center text-card-foreground">
             {users.map((user) => (
               <tr key={String(user.id)} className="border-b border-[#D9D9D9]">
@@ -83,6 +109,7 @@ export default function AllUsersTable({
                           <EditUserModal
                             {...props}
                             rolesData={rolesData}
+                            parentAgentOptions={parentAgentOptions}
                             onSave={() => router.refresh()}
                           />
                         ),
@@ -109,6 +136,9 @@ export default function AllUsersTable({
                 <td className="px-4 py-2 text-xs text-card-foreground">{user.phone || "N/A"}</td>
                 <td className="px-4 py-2 text-xs text-card-foreground">
                   {(user.role_details || []).map((role) => role.name).join(", ") || "N/A"}
+                </td>
+                <td className="px-4 py-2 text-xs text-card-foreground">
+                  {user.parent_agent_details?.name || "N/A"}
                 </td>
                 <td className="px-4 py-2 text-xs">
                   <span

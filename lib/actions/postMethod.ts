@@ -5,6 +5,31 @@ import { decryptToken } from "@/lib/decrypt";
 import { TicketMessage } from "@/lib/types";
 
 /**
+ * Prefer Django/DRF `detail` (string or list) over message/error for toast text.
+ */
+function resolveApiErrorMessage(responseData: Record<string, unknown>): string {
+  const detail = responseData.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const joined = detail
+      .map((item) => (typeof item === "string" ? item : String(item)))
+      .filter(Boolean)
+      .join(" ");
+    if (joined) return joined;
+  }
+
+  if (typeof responseData.message === "string" && responseData.message.trim()) {
+    return responseData.message;
+  }
+  if (typeof responseData.error === "string" && responseData.error.trim()) {
+    return responseData.error;
+  }
+  return "Request failed";
+}
+
+/**
  * Generic POST method for making authenticated API calls with JSON data.
  * Automatically handles token refresh and 24-hour session validation.
  */
@@ -110,6 +135,17 @@ export async function postMethod(
                     message: retryResponseData.message || "Request successful",
                   };
                 }
+
+                // Retry returned a non-auth business error (e.g. 400 detail).
+                if (retryRes.status !== 401 && retryRes.status !== 403) {
+                  return {
+                    success: false,
+                    message: resolveApiErrorMessage(
+                      retryResponseData as Record<string, unknown>
+                    ),
+                    errors: retryResponseData.errors || retryResponseData,
+                  };
+                }
               }
             }
           }
@@ -127,8 +163,8 @@ export async function postMethod(
 
       return {
         success: false,
-        message: responseData.message || responseData.error || "Request failed",
-        errors: responseData.errors || {},
+        message: resolveApiErrorMessage(responseData as Record<string, unknown>),
+        errors: responseData.errors || responseData,
       };
     }
 

@@ -30,7 +30,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
       borderColor: "#363636",
     },
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -77,7 +77,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
       : "white",
     color: state.isSelected ? "white" : "#363636",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -92,7 +92,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
     ...provided,
     color: "#363636",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -104,7 +104,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
     ...provided,
     color: "#999",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -294,11 +294,11 @@ export const GasQuoteDetailsModal = ({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
         <div className="p-4 lg:p-6">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 lg:mb-8 gap-4">
-            <h2 className="font-['Plus_Jakarta_Sans'] font-semibold text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-3xl leading-5">
+            <h2 className="font-['Arial',Helvetica,sans-serif] font-semibold text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-3xl leading-5">
               Gas Quote
             </h2>
             <div className="flex items-center gap-2">
-              <span className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6">
+              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6">
                 Customer View:
               </span>
               <Switch
@@ -312,7 +312,7 @@ export const GasQuoteDetailsModal = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column - Current meter details */}
             <div>
-              <h3 className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
+              <h3 className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
                 <span className="text-[#48505e]">Current meter details</span>
                 <span className="text-[#dc3739]">*</span>
               </h3>
@@ -321,7 +321,7 @@ export const GasQuoteDetailsModal = ({
                 <CardContent className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
                   {/* MPRN Section */}
                   <div className="space-y-1.5 sm:space-y-2">
-                    <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                    <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                       MPRN:
                     </label>
                     <Input
@@ -334,7 +334,7 @@ export const GasQuoteDetailsModal = ({
 
                   {/* Postcode */}
                   <div className="space-y-1.5 sm:space-y-2">
-                    <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                    <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                       Postcode:
                     </label>
                     <Input
@@ -347,7 +347,7 @@ export const GasQuoteDetailsModal = ({
 
                   {/* Current Supplier */}
                   <div className="space-y-1.5 sm:space-y-2">
-                    <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                    <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                       Current Supplier:
                     </label>
                     <Select<SupplierOption>
@@ -365,7 +365,7 @@ export const GasQuoteDetailsModal = ({
 
                   {/* Contract Start Date */}
                   <div className="space-y-1.5 sm:space-y-2">
-                    <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                    <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                       Contract Start Date:
                     </label>
                     <CustomDateInput 
@@ -379,7 +379,7 @@ export const GasQuoteDetailsModal = ({
 
             {/* Right column - Current rates & charges */}
             <div>
-              <h3 className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
+              <h3 className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
                 <span className="text-[#48505e]">
                   Current rates & charges
                 </span>
@@ -392,7 +392,7 @@ export const GasQuoteDetailsModal = ({
                     {/* Row 1: Number of Days */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col space-y-2">
-                        <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                        <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                           Number of Days:
                         </label>
                         <Input
@@ -407,7 +407,7 @@ export const GasQuoteDetailsModal = ({
                     {/* Row 2: Current Standing Charge */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col space-y-2">
-                        <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                        <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                           Current Standing Charge:
                         </label>
                         <div className="relative">
@@ -418,7 +418,7 @@ export const GasQuoteDetailsModal = ({
                             className="h-8.75 border-[0.8px] border-solid border-[#363636] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] pr-[35px] text-xs sm:text-sm lg:text-base text-[#858D9D]"
                           />
                           <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                            <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                            <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                               P
                             </span>
                           </div>
@@ -429,7 +429,7 @@ export const GasQuoteDetailsModal = ({
                     {/* Row 3: Unit Rate */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col space-y-2">
-                        <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                        <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                           Unit Rate:
                         </label>
                         <div className="relative">
@@ -440,7 +440,7 @@ export const GasQuoteDetailsModal = ({
                             className="h-8.75 border-[0.8px] border-solid border-[#363636] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] pr-[35px] text-xs sm:text-sm lg:text-base text-[#858D9D]"
                           />
                           <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                            <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                            <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                               P
                             </span>
                           </div>
@@ -456,7 +456,7 @@ export const GasQuoteDetailsModal = ({
                             className="h-8.75 border-[0.8px] border-solid border-[#363636] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] pr-[55px] text-xs sm:text-sm lg:text-base text-[#858D9D]"
                           />
                           <div className="absolute right-0 top-0 w-[55px] h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                            <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                            <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                               Kwh
                             </span>
                           </div>

@@ -492,6 +492,48 @@ function pickRateValue(
   return quoteValue || "N/A";
 }
 
+/**
+ * Resolve display rates for a company-list / sites[].meters[] row.
+ * Prefer sold fields, then nested quote.standing_charge / day_rate / etc.
+ */
+export function resolveMeterDisplayRates(meter: Meter): {
+  standingCharge: string;
+  dayRate: string;
+  nightRate: string;
+  eveningWeekendRate: string;
+  winterRate: string;
+  dayKwh: string;
+  startDate: string;
+} {
+  const data = meter as ApplicationMeterApiResponse;
+  const quoteFields = extractQuoteFields(data);
+  const quoteRates = extractRatesFromQuoteFields(quoteFields, data.aq);
+
+  return {
+    standingCharge: pickRateValue(
+      meter.latestSoldStandingCharge,
+      quoteRates.currentStandingCharge
+    ),
+    dayRate: pickRateValue(meter.latestSoldDayRate, quoteRates.dayRate),
+    nightRate: pickRateValue(
+      meter.latestSoldNightRate,
+      quoteRates.nightRate
+    ),
+    eveningWeekendRate: pickRateValue(
+      meter.latestSoldEveningWeekendRate,
+      quoteRates.ewRate
+    ),
+    winterRate: pickRateValue(
+      meter.latestSoldWinterRate,
+      quoteRates.winterRate
+    ),
+    dayKwh: quoteRates.dayKwh || "",
+    startDate: quoteFields.Contract_Start_Date
+      ? formatDateForDisplay(quoteFields.Contract_Start_Date)
+      : "",
+  };
+}
+
 /** Map GET /meter/{id}/ response to contract details for the View modal. */
 export function mapMeterApiToContractDetails(
   data: ApplicationMeterApiResponse
@@ -544,24 +586,24 @@ export function mapMeterApiToContractDetails(
 
 /** Map company-list meter row to contract details (fallback without GET /meter). */
 export function mapMeterListItemToContractDetails(meter: Meter): ContractDetails {
+  const rates = resolveMeterDisplayRates(meter);
+
   return {
     contractCommission: "N/A",
-    startDate: "N/A",
+    startDate: rates.startDate || "N/A",
     soldSupplier: meter.latestsoldsuppliername || "N/A",
     tariff: meter.latesttariffname || "N/A",
     term: formatTermDisplay(meter.latestterm),
-    units: "kWh",
+    units: rates.dayKwh ? `${rates.dayKwh} kWh` : "kWh",
     uplifts: "N/A",
     rates: {
-      standingCharge: meter.latestSoldStandingCharge || "N/A",
-      dayRate: meter.latestSoldDayRate || "N/A",
-      ...(meter.latestSoldNightRate
-        ? { nightRate: meter.latestSoldNightRate }
+      standingCharge: rates.standingCharge,
+      dayRate: rates.dayRate,
+      ...(rates.nightRate !== "N/A" ? { nightRate: rates.nightRate } : {}),
+      ...(rates.eveningWeekendRate !== "N/A"
+        ? { eveningWeekendRate: rates.eveningWeekendRate }
         : {}),
-      ...(meter.latestSoldEveningWeekendRate
-        ? { eveningWeekendRate: meter.latestSoldEveningWeekendRate }
-        : {}),
-      ...(meter.latestSoldWinterRate ? { winterRate: meter.latestSoldWinterRate } : {}),
+      ...(rates.winterRate !== "N/A" ? { winterRate: rates.winterRate } : {}),
     },
     savings: "N/A",
     yearlyCost: "N/A",

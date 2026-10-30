@@ -78,15 +78,6 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
   // Local loading state to cover both direct API and fallback fetch
   const [isSearching, setIsSearching] = useState(false);
   const [businessTypeOptions, setBusinessTypeOptions] = useState<SelectOption[]>([]);
-  /**
-   * Baseline home postcode for existing companies (auto-filled from company data).
-   * Find stays disabled until the user changes the input away from this value.
-   */
-  const [baselineHomePostCode, setBaselineHomePostCode] = useState(() =>
-    form.companyType === "existing"
-      ? (form.homePostCode?.trim().toUpperCase() || "")
-      : ""
-  );
 
   const handleBusinessTypesSuccess = useCallback((data: unknown) => {
     if (
@@ -241,30 +232,6 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     onError: handleLocationError,
   });
 
-  const isExistingCompany = form.companyType === "existing";
-  const normalizedHomePostCode = form.homePostCode?.trim().toUpperCase() || "";
-  const hasHomePostCodeChanged =
-    !isExistingCompany ||
-    (normalizedHomePostCode.length > 0 &&
-      normalizedHomePostCode !== baselineHomePostCode);
-
-  const isFindDisabled =
-    isSearching ||
-    isLoadingLocations ||
-    !normalizedHomePostCode ||
-    (isExistingCompany && !hasHomePostCodeChanged);
-
-  // Capture late-arriving auto-filled postcode for existing companies.
-  useEffect(() => {
-    if (!isExistingCompany) {
-      setBaselineHomePostCode("");
-      return;
-    }
-    if (!baselineHomePostCode && normalizedHomePostCode) {
-      setBaselineHomePostCode(normalizedHomePostCode);
-    }
-  }, [isExistingCompany, baselineHomePostCode, normalizedHomePostCode]);
-
   // Function to handle postcode search with fallback
   const handlePostcodeSearch = useCallback(async () => {
     if (form.homePostCode?.trim()) {
@@ -331,10 +298,8 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     }
   }, [form.homeLocation, form.homeAddress, locationItems, handleAddressInput]);
 
-  // Restore location dropdown for new-company flow when navigating back with a postcode.
-  // Skip for existing companies — address is prefilled until the user changes postcode + Find.
+  // Restore location dropdown and options when navigating back if homePostCode exists
   useEffect(() => {
-    if (form.companyType !== "new") return;
     if (form.homePostCode && form.homePostCode.trim()) {
       setShowLocationDropdown(true);
       if (locationOptions.length === 0) {
@@ -345,21 +310,6 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleHomePostCodeChange = (rawValue: string) => {
-    const nextValue = rawValue.toUpperCase();
-    handleInput("homePostCode", nextValue);
-
-    if (!isExistingCompany) return;
-
-    // Reset lookup UI until the user clicks Find again with the new postcode.
-    setShowLocationDropdown(false);
-    setLocationOptions([]);
-    setLocationItems([]);
-    if (form.homeLocation) {
-      handleInput("homeLocation", undefined);
-    }
-  };
 
   /**
    * Decide when to show the structured home address section.
@@ -391,13 +341,13 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
           <div className="space-y-6 lg:space-y-8">
             {/* Contact Details */}
             <div>
-              <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Plus_Jakarta_Sans',Helvetica] mb-4">
+              <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Arial',Helvetica,sans-serif] mb-4">
                 Contact Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Primary Contact Title <span className="text-red-500">*</span>
                     </Label>
                     <CustomSelect
@@ -414,7 +364,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Primary Contact First Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -422,7 +372,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("primaryContactFirstName", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.primaryContactFirstName ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.primaryContactFirstName ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="John"
                     />
                     {validationErrors.primaryContactFirstName && (
@@ -430,7 +380,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Primary Contact Position <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -438,7 +388,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("primaryContactPosition", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.primaryContactPosition ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.primaryContactPosition ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="Manager"
                     />
                     {validationErrors.primaryContactPosition && (
@@ -446,7 +396,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Primary Contact Email <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -454,7 +404,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("primaryContactEmail", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.primaryContactEmail ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.primaryContactEmail ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="john@company.com"
                       type="email"
                     />
@@ -465,7 +415,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Business Type <span className="text-red-500">*</span>
                     </Label>
                     <CustomSelect
@@ -484,7 +434,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Primary Contact Last Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -492,7 +442,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("primaryContactLastName", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.primaryContactLastName ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.primaryContactLastName ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="Doe"
                     />
                     {validationErrors.primaryContactLastName && (
@@ -500,7 +450,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Telephone Number <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -510,7 +460,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                         const sanitized = raw.replace(/[A-Za-z]/g, "");
                         handleInput("telephoneNumber", sanitized);
                       }}
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.telephoneNumber ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.telephoneNumber ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="+44 20 1234 5678"
                       type="tel"
                       inputMode="tel"
@@ -526,13 +476,13 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
 
             {/* Partner/Owner Info */}
             <div>
-              <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Plus_Jakarta_Sans',Helvetica] mb-4">
+              <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Arial',Helvetica,sans-serif] mb-4">
                 Partner/Owner Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Owner/Partner Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -540,7 +490,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("ownerPartnerName", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.ownerPartnerName ? 'border-red-500' : 'border-neutral-500'}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.ownerPartnerName ? 'border-red-500' : 'border-neutral-500'}`}
                       placeholder="Jane Smith"
                     />
                     {validationErrors.ownerPartnerName && (
@@ -549,7 +499,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                   </div>
                   {/* Post Code */}
                   <div className="w-full lg:max-w-2/3">
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Home Post Code <span className="text-red-500">*</span>
                     </Label>
                     <div className="flex">
@@ -557,17 +507,12 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                         className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${validationErrors.homePostCode ? 'border-red-500' : 'border-neutral-500'}`}
                         placeholder="E6 3BJ"
                         value={form.homePostCode}
-                        onChange={(e) => handleHomePostCodeChange(e.target.value)}
+                        onChange={(e) => handleInput("homePostCode", e.target.value.toUpperCase())}
                       />
                       <Button 
-                        className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px]"
                         onClick={handlePostcodeSearch}
-                        disabled={isFindDisabled}
-                        title={
-                          isExistingCompany && !hasHomePostCodeChanged
-                            ? "Change the postcode to look up a new address"
-                            : undefined
-                        }
+                        disabled={isSearching || isLoadingLocations || !form.homePostCode?.trim()}
                       >
                         {isSearching || isLoadingLocations ? "..." : "Find"}
                       </Button>
@@ -576,16 +521,16 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       <p className="text-sm text-red-500 mt-1">{validationErrors.homePostCode[0]}</p>
                     )}
                   </div>
-                  {/*
+                  {/* 
                     Location List (Dropdown)
-                    - New company: shown after Find, same as before.
-                    - Existing company: shown only after the user changes postcode and clicks Find.
-                    Selecting a location always replaces the home address fields.
+                    - Only show when postcode is provided, "Find" is clicked,
+                      AND the company is marked as "new".
+                    - For existing companies, the home address can be prefilled
+                      from the backend, so we hide this manual selection UI.
                   */}
-                  {showLocationDropdown &&
-                    (form.companyType === "new" || hasHomePostCodeChanged) && (
+                  {showLocationDropdown && form.companyType === "new" && (
                     <div>
-                      <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                      <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                         Location List <span className="text-red-500">*</span>
                       </Label>
                       <CustomSelect
@@ -599,7 +544,6 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                             const selected = Number.isNaN(index) ? undefined : locationItems[index];
                             if (selected && selected.address) {
                               const addr = selected.address;
-                              // Always replace address lines on location select
                               handleAddressInput(0, addr.premises || '');
                               handleAddressInput(1, addr.address_line_1 || '');
                               handleAddressInput(2, addr.locality || '');
@@ -621,7 +565,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Owner/Partner DOB <span className="text-red-500">*</span>
                     </Label>
                     <CustomDateInput
@@ -639,59 +583,37 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
               {/* Address Section - show when a location is selected or when a prefilled homeAddress exists (e.g. existing company) */}
               {shouldShowHomeAddressSection && (
                 <div className="w-full lg:w-3/4 mt-6">
-                  <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-3">
+                  <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-3">
                     Address <span className="text-red-500">*</span>
                   </Label>
-                  <div
-                    className={`bg-[#ffffff] rounded-lg border border-solid p-4 lg:p-6 ${
-                      validationErrors.homeAddress
-                        ? "border-red-500"
-                        : "border-[#c4c4c4]"
-                    }`}
-                  >
+                  <div className="bg-[#ffffff] rounded-lg border border-solid border-[#c4c4c4] p-4 lg:p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                      {[0, 1, 2, 3].map((addressLineIndex) => {
-                        const lineValue = form.homeAddress[addressLineIndex] ?? "";
-                        const hasStreet =
-                          Boolean(form.homeAddress[0]?.trim()) ||
-                          Boolean(form.homeAddress[1]?.trim());
-                        const isStreetLine =
-                          addressLineIndex === 0 || addressLineIndex === 1;
-                        const shouldHighlightEmpty =
-                          Boolean(validationErrors.homeAddress) &&
-                          ((isStreetLine && !hasStreet && !lineValue.trim()) ||
-                            (addressLineIndex === 2 && !lineValue.trim()) ||
-                            (addressLineIndex === 3 && !lineValue.trim()));
-                        const placeholders = [
-                          "45",
-                          "Macaulay Road",
-                          "London",
-                          "England",
-                        ] as const;
-
-                        return (
-                          <Input
-                            key={`home-address-${addressLineIndex}`}
-                            className={`h-[35px] rounded-lg border border-solid bg-white shadow-shadow-xs ${
-                              shouldHighlightEmpty
-                                ? "border-red-500"
-                                : "border-[#cfd4dc]"
-                            }`}
-                            placeholder={placeholders[addressLineIndex]}
-                            value={lineValue}
-                            onChange={(e) =>
-                              handleAddressInput(addressLineIndex, e.target.value)
-                            }
-                          />
-                        );
-                      })}
+                      <Input
+                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
+                        placeholder="45"
+                        value={form.homeAddress[0]}
+                        onChange={(e) => handleAddressInput(0, e.target.value)}
+                      />
+                      <Input
+                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
+                        placeholder="Macaulay Road"
+                        value={form.homeAddress[1]}
+                        onChange={(e) => handleAddressInput(1, e.target.value)}
+                      />
+                      <Input
+                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
+                        placeholder="London"
+                        value={form.homeAddress[2]}
+                        onChange={(e) => handleAddressInput(2, e.target.value)}
+                      />
+                      <Input
+                        className="h-[35px] rounded-lg border border-solid border-[#cfd4dc] bg-white shadow-shadow-xs"
+                        placeholder="England"
+                        value={form.homeAddress[3]}
+                        onChange={(e) => handleAddressInput(3, e.target.value)}
+                      />
                     </div>
                   </div>
-                  {validationErrors.homeAddress && (
-                    <p className="text-sm text-red-500 mt-2">
-                      {validationErrors.homeAddress[0]}
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -699,7 +621,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
               <div className="w-1/2 mt-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Time at Address (Years) <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -707,7 +629,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("timeAtAddressYear", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.timeAtAddressYear ? "border-red-500" : "border-neutral-500"}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.timeAtAddressYear ? "border-red-500" : "border-neutral-500"}`}
                       placeholder="5"
                       type="number"
                     />
@@ -718,7 +640,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     )}
                   </div>
                   <div>
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Time at Address (Months) <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -726,7 +648,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                       onChange={(e) =>
                         handleInput("timeAtAddressMonth", e.target.value)
                       }
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${validationErrors.timeAtAddressMonth ? "border-red-500" : "border-neutral-500"}`}
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.timeAtAddressMonth ? "border-red-500" : "border-neutral-500"}`}
                       placeholder="6"
                       type="number"
                     />

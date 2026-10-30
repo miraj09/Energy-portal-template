@@ -111,6 +111,11 @@ function formatCommissionPounds(amount: number): string {
   });
 }
 
+/** Compare supplier names without case or surrounding whitespace. */
+function normalizeSupplierName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 export const QuoteTable = ({
   quoteType = "electricity",
   quoteId,
@@ -329,54 +334,49 @@ export const QuoteTable = ({
   // Gas quote details from API
   const [gasQuoteDetails] = useState<GasQuoteDetailsData | null>(null);
 
-  const [selectedSupplier, setSelectedSupplier] = useState<SelectOption | null>(
-    null
-  );
-  const [selectedSort, setSelectedSort] = useState<SelectOption | null>(null);
+  // Filter key is the displayed supplier name. Null shows every quote.
+  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
 
-  /** Unique supplier names from the current quote table rows. */
+  // Options stay based on the full list so a selection does not hide other suppliers.
   const supplierOptions = useMemo<SelectOption[]>(() => {
-    const uniqueSupplierNames = Array.from(
-      new Set(quoteData.map((quote) => quote.supplier).filter(Boolean))
-    ).sort((left, right) => left.localeCompare(right));
+    const seenSupplierKeys = new Set<string>();
+    const options: SelectOption[] = [];
 
-    return uniqueSupplierNames.map((supplierName) => ({
-      value: supplierName,
-      label: supplierName,
-    }));
+    for (const quote of quoteData) {
+      const supplierLabel = quote.supplier.trim();
+      if (!supplierLabel) continue;
+
+      const supplierKey = normalizeSupplierName(supplierLabel);
+      if (seenSupplierKeys.has(supplierKey)) continue;
+
+      seenSupplierKeys.add(supplierKey);
+      options.push({ value: supplierLabel, label: supplierLabel });
+    }
+
+    return options;
   }, [quoteData]);
 
-  const sortOptions: SelectOption[] = [
+  const visibleQuotes = useMemo(() => {
+    if (!selectedSupplier) return quoteData;
+
+    const selectedSupplierKey = normalizeSupplierName(selectedSupplier);
+    return quoteData.filter(
+      (quote) => normalizeSupplierName(quote.supplier) === selectedSupplierKey,
+    );
+  }, [quoteData, selectedSupplier]);
+
+  const selectedSupplierOption = selectedSupplier
+    ? (supplierOptions.find(
+        (option) =>
+          normalizeSupplierName(option.value) ===
+          normalizeSupplierName(selectedSupplier),
+      ) ?? null)
+    : null;
+
+  const sortOptions = [
     { value: "high", label: "Price: High to Low" },
     { value: "low", label: "Price: Low to High" },
   ];
-
-  /** Apply supplier filter, then optional price sort, without mutating source data. */
-  const displayedQuotes = useMemo(() => {
-    let filteredQuotes = [...quoteData];
-
-    if (selectedSupplier?.value) {
-      filteredQuotes = filteredQuotes.filter(
-        (quote) => quote.supplier === selectedSupplier.value
-      );
-    }
-
-    if (selectedSort?.value === "high") {
-      filteredQuotes.sort(
-        (left, right) =>
-          parseTotalCostPounds(right.totalCost) -
-          parseTotalCostPounds(left.totalCost)
-      );
-    } else if (selectedSort?.value === "low") {
-      filteredQuotes.sort(
-        (left, right) =>
-          parseTotalCostPounds(left.totalCost) -
-          parseTotalCostPounds(right.totalCost)
-      );
-    }
-
-    return filteredQuotes;
-  }, [quoteData, selectedSupplier, selectedSort]);
 
   const handleShowDetails = async () => {
     if (quoteType === "gas") {
@@ -456,7 +456,7 @@ export const QuoteTable = ({
       <Card className="w-full shadow-[0px_4px_10px_rgba(0,0,0,0.25)] rounded-lg">
         <CardContent className="p-6">
           {/* Top Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex flex-wrap gap-4 mb-6">
             <Button
               variant="default"
               className="bg-[#346fb6] text-white cursor-pointer select-none"
@@ -466,17 +466,16 @@ export const QuoteTable = ({
               {isHeaderLoading ? "Loading..." : "Show Details"}
             </Button>
 
-            <div className="flex items-center gap-3 ml-auto">
-              <span className="font-medium text-[#48505e] text-sm whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-[#48505e] text-sm">
                 Save Quote Reference:
               </span>
               <Input
-                className="w-[200px] h-[35px] border-neutral-500 shadow-shadow-xs"
+                className="w-[155px] h-[35px] border-neutral-500 shadow-shadow-xs"
                 placeholder="Enter quote reference"
               />
             </div>
 
-            {/*
             <Button
               variant="default"
               className="bg-[#346fb6] text-white ml-auto"
@@ -491,7 +490,6 @@ export const QuoteTable = ({
             <Button variant="default" className="bg-[#346fb6] text-white">
               Attach Quote to Company
             </Button>
-            */}
           </div>
 
           {/* Filter Controls */}
@@ -502,11 +500,13 @@ export const QuoteTable = ({
               </span>
               <CustomSelect
                 options={supplierOptions}
+                value={selectedSupplierOption}
+                onChange={(option) => {
+                  setSelectedSupplier(option?.value ?? null);
+                }}
+                isClearable
                 placeholder="Select supplier"
                 className="w-48"
-                value={selectedSupplier}
-                onChange={(option) => setSelectedSupplier(option)}
-                isClearable
               />
             </div>
 
@@ -517,9 +517,6 @@ export const QuoteTable = ({
               <CustomSelect
                 options={sortOptions}
                 placeholder="Select sort by"
-                value={selectedSort}
-                onChange={(option) => setSelectedSort(option)}
-                isClearable
               />
             </div>
           </div>
@@ -605,13 +602,12 @@ export const QuoteTable = ({
                   : "min-w-[1040px] md:min-w-[820px] sm:min-w-[580px]"
               }`}
             >
-              {displayedQuotes.length === 0 ? (
-                <div className="rounded-[10px] border border-[#bbbbbb] px-4 py-8 text-center text-sm text-[#48505e]">
-                  No quotes match the selected supplier.
-                </div>
+              {selectedSupplier && visibleQuotes.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#48505e]">
+                  No quotes for this supplier.
+                </p>
               ) : null}
-
-              {displayedQuotes.map((quote) => {
+              {visibleQuotes.map((quote) => {
                 const totalCostPounds = parseTotalCostPounds(quote.totalCost);
                 const commissionPounds =
                   (totalCostPounds * commissionPercent) / 100;

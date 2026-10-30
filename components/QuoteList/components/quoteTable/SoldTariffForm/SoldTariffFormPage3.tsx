@@ -127,12 +127,12 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
           <div className="space-y-6 lg:space-y-8">
           {/* Billing Information */}
           <div>
-            <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Plus_Jakarta_Sans',Helvetica] mb-4">
+            <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Arial',Helvetica,sans-serif] mb-4">
               Company Billing Details
             </h2>
             <div className="space-y-6">
               <div className="w-full lg:max-w-1/3">
-                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Billing Type <span className="text-red-500">*</span>
                   {billingTypesLoading && (
                     <span className="ml-2 text-sm text-gray-500">(Loading...)</span>
@@ -156,7 +156,7 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
               {form.billingType?.value === "different" && (
                 <>
                   <div className="w-full lg:max-w-1/3">
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Billing Post Code
                     </Label>
                     <div className="flex">
@@ -175,7 +175,7 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                   </div>
 
                   <div className="w-full max-w-md">
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Billing Location List
                     </Label>
                     <CustomSelect
@@ -190,7 +190,7 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                   </div>
 
                   <div className="w-full lg:w-3/4">
-                    <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-3">
+                    <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-3">
                       Billing Address
                     </Label>
                     <div className="bg-[#ffffff] rounded-lg border border-solid border-[#c4c4c4] p-4 lg:p-6">
@@ -238,7 +238,7 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
           {/* Time Trading and Incorporated Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
             <div>
-              <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+              <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                 Time Trading For
               </Label>
               <Input
@@ -246,12 +246,12 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                 onChange={(e) =>
                   handleInput("timeTradingFor", e.target.value)
                 }
-                className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                 placeholder="5 years"
               />
             </div>
             <div>
-              <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+              <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                 Incorporated Date
               </Label>
               <CustomDateInput
@@ -264,12 +264,12 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
 
           {/* Company Details */}
           <div>
-            <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Plus_Jakarta_Sans',Helvetica] mb-4">
+            <h2 className="font-semibold text-[#363636] text-lg sm:text-xl tracking-[0] leading-5 font-['Arial',Helvetica,sans-serif] mb-4">
               Company Details
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
               <div>
-                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Director First Name
                 </Label>
                 <Input
@@ -277,12 +277,12 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                   onChange={(e) =>
                     handleInput("directorFirstName", e.target.value)
                   }
-                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   placeholder="John"
                 />
               </div>
               <div>
-                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Director Last Name
                 </Label>
                 <Input
@@ -290,7 +290,7 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                   onChange={(e) =>
                     handleInput("directorLastName", e.target.value)
                   }
-                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   placeholder="Smith"
                 />
               </div>

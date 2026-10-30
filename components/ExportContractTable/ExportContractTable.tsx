@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Table,
   TableHeader,
@@ -28,6 +28,7 @@ import { exportReports } from "@/lib/actions/exportReportServer";
 import { CustomSelect, type SelectOption } from "@/ui/select";
 import Link from "next/link";
 import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
+import { useAgentUserIdParam } from "@/hooks/useAgentUserIdParam";
 
 const ALL_COMPANIES_OPTION: SelectOption = { value: "", label: "All companies" };
 const ALL_LEAD_STATUSES_OPTION: SelectOption = {
@@ -76,6 +77,14 @@ const ExportContractTable = () => {
   // Selection state: Set of contact/contract IDs that are currently checked
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const { agentUserIdFilter, isReady: isAgentUserIdReady } =
+    useAgentUserIdParam();
+
+  const queryFilters = useMemo(
+    () => ({ ...filters, ...agentUserIdFilter }),
+    [filters, agentUserIdFilter]
+  );
+
   const {
     results: contracts,
     totalItems,
@@ -86,7 +95,8 @@ const ExportContractTable = () => {
     page: currentPage,
     pageSize: itemsPerPage,
     search: searchTerm,
-    filters,
+    filters: queryFilters,
+    enabled: isAgentUserIdReady,
   });
 
   /** Map API company results to select options (id + company_name). */
@@ -122,14 +132,15 @@ const ExportContractTable = () => {
       const PAGE_SIZE = 10;
       try {
         setCompanyOptionsLoading(true);
-        const filters: TableFilters = {
+        const companyFilters: TableFilters = {
           page,
           page_size: PAGE_SIZE,
+          ...agentUserIdFilter,
         };
         if (search.trim()) {
-          filters.company_name = search.trim();
+          companyFilters.company_name = search.trim();
         }
-        const result = await getCompanyList(filters);
+        const result = await getCompanyList(companyFilters);
         if (!result.success || !result.data?.results) {
           if (!append) setCompanyOptions([]);
           setHasMoreCompanies(false);
@@ -157,11 +168,13 @@ const ExportContractTable = () => {
         setCompanyOptionsLoading(false);
       }
     },
-    [mapCompaniesToOptions]
+    [mapCompaniesToOptions, agentUserIdFilter]
   );
 
   /** Debounced fetch: when user types in company dropdown, fetch page 1 with search. */
   useEffect(() => {
+    if (!isAgentUserIdReady) return;
+
     if (companySearchDebounceRef.current) {
       clearTimeout(companySearchDebounceRef.current);
     }
@@ -177,7 +190,7 @@ const ExportContractTable = () => {
         clearTimeout(companySearchDebounceRef.current);
       }
     };
-  }, [companySearch, fetchCompaniesPage]);
+  }, [companySearch, fetchCompaniesPage, isAgentUserIdReady]);
 
   /** Load next page when user scrolls to bottom of company dropdown menu. */
   const handleCompanyMenuScrollToBottom = useCallback(() => {
@@ -347,13 +360,6 @@ const ExportContractTable = () => {
     return c.company?.company_name ?? "N/A";
   };
 
-  // Display company id in the ID column; details still navigate with contact id.
-  const getCompanyId = (c: ContactRecord): string => {
-    const companyId = c.company?.id;
-    if (companyId == null) return "N/A";
-    return String(companyId).split("-")[0] ?? "N/A";
-  };
-
   const getPostCode = (c: ContactRecord): string => {
     const value = c.company?.current_postcode ?? c.company?.current_postcode;
     return value != null && typeof value === "string" ? value : "N/A";
@@ -382,6 +388,20 @@ const ExportContractTable = () => {
       return db - da;
     });
     return sorted[0] ?? null;
+  };
+
+  // Show lead id as the ID column label; details still navigate with contact id.
+  // Company id stays available via c.company?.id for API payloads.
+  const getLeadIdLabel = (c: ContactRecord): string => {
+    const fromCompany = c.company?.lead_id;
+    if (fromCompany != null && String(fromCompany).trim() !== "") {
+      return String(fromCompany);
+    }
+    const latestSale = getLatestSubmittedSale(c);
+    if (latestSale?.lead_id != null) {
+      return String(latestSale.lead_id);
+    }
+    return "N/A";
   };
 
   /**
@@ -796,14 +816,14 @@ const ExportContractTable = () => {
                     <TableCell>
                       {contract.id ? (
                         <Link href={`/export-contract/${contract.id}`}>
-                          <InfoButton>{getCompanyId(contract)}</InfoButton>
+                          <InfoButton>{getLeadIdLabel(contract)}</InfoButton>
                         </Link>
                       ) : (
-                        getCompanyId(contract)
+                        getLeadIdLabel(contract)
                       )}
                     </TableCell>
                     <TableCell>{getSubmittedBy(contract)}</TableCell>
-                    {/* <TableCell>{getCompanyId(contract)}</TableCell> */}
+                    {/* Company id available via contract.company?.id for API use */}
                     <TableCell>{getCompanyName(contract)}</TableCell>
                     <TableCell
                       className="w-48 max-w-48 break-words whitespace-normal"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { JSX, useMemo, useCallback } from "react";
+import React, { JSX, useMemo, useCallback, useEffect, useState } from "react";
 import { ScrollArea } from "@/ui/scroll-area";
 import {
   NavigationMenuItem,
@@ -13,6 +13,7 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { collectMenuHrefs } from "@/lib/navigation/menuUtils";
 import { useFilteredSidebarMenu } from "@/hooks/useFilteredSidebarMenu";
 import type { MenuNode } from "@/contexts/MenuContext";
+import { getWebsiteEnquiryNewCount } from "@/composable/websiteEnquiry";
 import { branding } from "@/lib/config/branding";
 
 import DashboardIcon from "../Icons/DashboardIcon";
@@ -26,9 +27,11 @@ import TPIDocumentIcon from "../Icons/TPIDocumentIcon";
 import InvoicesIcon from "../Icons/InvoicesIcon";
 import UsersIcon from "../Icons/UsersIcon";
 import AllApplicationIcon from "../Icons/AllApplicationIcon";
+import WebsiteEnquiriesIcon from "../Icons/WebsiteEnquiriesIcon";
 
 const ACTIVE_COLOR = "var(--primary)";
 const INACTIVE_COLOR = "#737373";
+const WEBSITE_ENQUIRIES_MENU_ID = "website-enquiries";
 
 function isPathActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -37,6 +40,14 @@ function isPathActive(pathname: string, href: string): boolean {
 function isMenuNodeActive(pathname: string, node: MenuNode): boolean {
   if (node.href && isPathActive(pathname, node.href)) return true;
   return node.subItems?.some((child) => isMenuNodeActive(pathname, child)) ?? false;
+}
+
+function menuContainsId(nodes: MenuNode[], id: string): boolean {
+  return nodes.some(
+    (node) =>
+      node.id === id ||
+      (node.subItems ? menuContainsId(node.subItems, id) : false)
+  );
 }
 
 function renderIcon(id: string, active: boolean): React.ReactNode {
@@ -55,6 +66,8 @@ function renderIcon(id: string, active: boolean): React.ReactNode {
       return <ReportsIcon color={color} width={20} height={20} />;
     case "tickets":
       return <TicketsIcon color={color} width={34} height={34} />;
+    case "website-enquiries":
+      return <WebsiteEnquiriesIcon color={color} width={22} height={22} />;
     case "docusign":
       return <DocuSignIcon color={color} width={22} height={23} />;
     case "tpi-document":
@@ -73,7 +86,8 @@ function renderIcon(id: string, active: boolean): React.ReactNode {
 function mapMenuNodeToItem(
   node: MenuNode,
   pathname: string,
-  navigate: (href: string) => void
+  navigate: (href: string) => void,
+  badgeById: Record<string, number>
 ): NavigationMenuItemProps {
   const active = isMenuNodeActive(pathname, node);
   const subItems = node.subItems?.map((child) => ({
@@ -88,6 +102,7 @@ function mapMenuNodeToItem(
     active,
     subItems,
     onClick: node.href ? () => navigate(node.href!) : undefined,
+    badge: badgeById[node.id],
   };
 }
 
@@ -97,6 +112,7 @@ export const NavigationMenu = (): JSX.Element => {
   const { isSidebarCollapsed } = useSidebar();
   const { startRouteLoading } = useRouteLoading();
   const { menu, isLoaded: isMenuLoaded } = useFilteredSidebarMenu();
+  const [newEnquiryCount, setNewEnquiryCount] = useState(0);
 
   const navigate = useCallback(
     (href: string) => {
@@ -107,9 +123,43 @@ export const NavigationMenu = (): JSX.Element => {
     [router, pathname, startRouteLoading]
   );
 
+  const showWebsiteEnquiries = useMemo(
+    () => menuContainsId(menu, WEBSITE_ENQUIRIES_MENU_ID),
+    [menu]
+  );
+
+  // Lightweight badge fetch — does not block sidebar render.
+  useEffect(() => {
+    if (!isMenuLoaded || !showWebsiteEnquiries) {
+      setNewEnquiryCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    getWebsiteEnquiryNewCount()
+      .then((count) => {
+        if (!cancelled) setNewEnquiryCount(count);
+      })
+      .catch(() => {
+        if (!cancelled) setNewEnquiryCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMenuLoaded, showWebsiteEnquiries, pathname]);
+
+  const badgeById = useMemo((): Record<string, number> => {
+    if (newEnquiryCount <= 0) return {};
+    return { [WEBSITE_ENQUIRIES_MENU_ID]: newEnquiryCount };
+  }, [newEnquiryCount]);
+
   const menuItems = useMemo(
-    () => menu.map((item) => mapMenuNodeToItem(item, pathname, navigate)),
-    [menu, pathname, navigate]
+    () =>
+      menu.map((item) =>
+        mapMenuNodeToItem(item, pathname, navigate, badgeById)
+      ),
+    [menu, pathname, navigate, badgeById]
   );
 
   React.useEffect(() => {
@@ -132,21 +182,19 @@ export const NavigationMenu = (): JSX.Element => {
           <Image
             width={32}
             height={32}
-            className="w-8 h-8 object-contain"
+            className="w-8 h-8 object-cover"
             alt={branding.logoAlt}
             src={branding.logoSrc}
             priority
-            unoptimized
           />
         ) : (
           <Image
             width={139}
             height={52}
-            className="w-[139px] h-[52px] object-contain"
+            className="w-[139px] h-[52px] object-cover"
             alt={branding.logoAlt}
             src={branding.logoSrc}
             priority
-            unoptimized
           />
         )}
       </div>
@@ -165,6 +213,7 @@ export const NavigationMenu = (): JSX.Element => {
                 subItems={item.subItems}
                 onClick={item.onClick}
                 isCollapsed={isSidebarCollapsed}
+                badge={item.badge}
               />
             ))
           )}

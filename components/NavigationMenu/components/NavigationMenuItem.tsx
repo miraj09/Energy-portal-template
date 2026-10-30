@@ -16,6 +16,8 @@ export interface NavigationMenuItemProps {
   subItems?: SubMenuItem[];
   onClick?: () => void;
   isCollapsed?: boolean;
+  /** Optional count badge shown next to the label (e.g. new enquiries). */
+  badge?: number;
 }
 
 export const NavigationMenuItem = memo(({
@@ -25,9 +27,11 @@ export const NavigationMenuItem = memo(({
   subItems,
   onClick,
   isCollapsed = false,
+  badge,
 }: NavigationMenuItemProps): JSX.Element => {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasSubItems = subItems && subItems.length > 0;
+  const showBadge = typeof badge === "number" && badge > 0;
 
   // Auto-expand submenu if any submenu item is active
   React.useEffect(() => {
@@ -59,8 +63,16 @@ export const NavigationMenuItem = memo(({
       <span className={isCollapsed ? '' : 'mr-3'}>{icon}</span>
       {!isCollapsed && (
         <>
-          <span className="font-['Inter'] text-sm flex-1 text-left">
-            {label}
+          <span className="font-['Arial',Helvetica,sans-serif] text-sm flex-1 text-left flex items-center gap-2 min-w-0">
+            <span className="truncate">{label}</span>
+            {showBadge && (
+              <span
+                className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold leading-none shrink-0"
+                aria-label={`${badge} new`}
+              >
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
           </span>
           {hasSubItems && (
             <span className="ml-auto">
@@ -104,7 +116,7 @@ export const NavigationMenuItem = memo(({
               <span className="mr-3">
                 <div className="w-2 h-2 rounded-full bg-current opacity-50" />
               </span>
-              <span className="font-['Inter'] text-sm">{subItem.label}</span>
+              <span className="font-['Arial',Helvetica,sans-serif] text-sm">{subItem.label}</span>
             </Button>
           ))}
         </div>

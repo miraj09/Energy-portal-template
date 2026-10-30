@@ -4,7 +4,8 @@ import { FilterAwarePagination } from "@/components/ui/FilterAwarePagination";
 import { getResource } from "@/lib/baseQueries";
 import { SIDEBAR_NAVIGATION_SECTION } from "@/lib/permissions/constants";
 import { isSessionExpired } from "@/lib/constants/authErrors";
-import type { UserRecord } from "@/lib/types/user";
+import { getParentAgentOptions } from "@/lib/actions/getParentAgents";
+import type { ParentAgentOption, UserRecord } from "@/lib/types/user";
 
 export default async function UserListPage({
   searchParams,
@@ -19,6 +20,7 @@ export default async function UserListPage({
 
   let users: UserRecord[] = [];
   let rolesData: Array<{ id: number; name: string }> = [];
+  let parentAgentOptions: ParentAgentOption[] = [];
   let totalItems = 0;
   let itemsPerPage = 10;
   let totalPages = 1;
@@ -31,10 +33,12 @@ export default async function UserListPage({
       apiUrl += `&search=${encodeURIComponent(searchParam.trim())}`;
     }
 
-    const [usersRes, rolesRes] = await Promise.all([
+    const [usersRes, rolesRes, parentAgents] = await Promise.all([
       getResource(apiUrl, {}, { section: SIDEBAR_NAVIGATION_SECTION, action: "view_user_list" }),
       getResource("api/v1/auth/web/role-list/"),
+      getParentAgentOptions(),
     ]);
+    parentAgentOptions = parentAgents;
 
     const payload = (usersRes.data || usersRes) as {
       results?: UserRecord[];
@@ -71,6 +75,7 @@ export default async function UserListPage({
           tableTitle="All Users"
           searchQuery={searchParam}
           rolesData={rolesData}
+          parentAgentOptions={parentAgentOptions}
         />
         <FilterAwarePagination
           currentPage={activePage}

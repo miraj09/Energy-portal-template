@@ -13,3 +13,4 @@ export { default as SubmittedContactsModal } from "./SubmittedContactsModal";
 export { default as AddMeterModal } from "./AddMeterModal";
 export { default as AddSiteModal } from "./AddSiteModal";
 export { default as EditMeterModal } from "./EditMeterModal";
+export { default as SendContractModal } from "./SendContractModal";

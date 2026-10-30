@@ -20,6 +20,8 @@ interface AddMeterModalProps {
   siteId: number;
   siteName: string;
   sitePostcode: string;
+  /** Company-linked quote id from application details — sent as `quote` on meter create. */
+  quoteId?: number | null;
 }
 
 const METER_TYPE_OPTIONS: { value: MeterType; label: string }[] = [
@@ -34,6 +36,7 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
   siteId,
   siteName,
   sitePostcode,
+  quoteId = null,
 }) => {
   const [selectedType, setSelectedType] = useState<MeterType | null>(null);
 
@@ -100,6 +103,7 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
                 variant="applicationQuote"
                 companyId={companyId}
                 siteId={siteId}
+                quoteId={quoteId ?? undefined}
                 defaultPostcode={sitePostcode}
               />
             ) : (
@@ -107,6 +111,7 @@ const AddMeterModal: React.FC<AddMeterModalProps> = ({
                 variant="applicationQuote"
                 companyId={companyId}
                 siteId={siteId}
+                quoteId={quoteId ?? undefined}
                 defaultPostcode={sitePostcode}
               />
             )}

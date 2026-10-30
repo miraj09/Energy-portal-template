@@ -75,7 +75,7 @@ const Dashboard = (): JSX.Element => {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
-        <h1 className="font-medium text-[#737373] font-['Inter', Plus_Jakarta_Sans',Helvetica] mt-5">
+        <h1 className="font-medium text-[#737373] font-['Arial',Helvetica,sans-serif] mt-5">
           Dashboard
         </h1>
         <div className="flex items-center justify-center h-64">
@@ -88,7 +88,7 @@ const Dashboard = (): JSX.Element => {
   if (error) {
     return (
       <div className="flex-1 flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
-        <h1 className="font-medium text-[#737373] font-['Inter', Plus_Jakarta_Sans',Helvetica] mt-5">
+        <h1 className="font-medium text-[#737373] font-['Arial',Helvetica,sans-serif] mt-5">
           Dashboard
         </h1>
         <div className="flex items-center justify-center h-64">
@@ -100,7 +100,7 @@ const Dashboard = (): JSX.Element => {
 
   return (
     <div className="flex-1 flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
-      <h1 className="font-medium text-[#737373] font-['Inter', Plus_Jakarta_Sans',Helvetica] mt-5">
+      <h1 className="font-medium text-[#737373] font-['Arial',Helvetica,sans-serif] mt-5">
         Dashboard
       </h1>
 

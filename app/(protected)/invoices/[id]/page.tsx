@@ -18,11 +18,11 @@ import {
   type InvoiceApiRow,
 } from "@/composable/invoiceDisplay";
 import { downloadElementAsPdf } from "@/composable/downloadInvoicePdf";
+import { branding } from "@/lib/config/branding";
 import {
   downloadInvoiceBackingDataCsv,
   downloadInvoiceBackingDataExcel,
 } from "@/composable/exportInvoiceBackingData";
-import { branding } from "@/lib/config/branding";
 
 const INVOICE_STYLES = `
 #invoice-printable {
@@ -106,6 +106,8 @@ const InvoiceDetailsPage = () => {
     ? mapInvoiceApiToDetailsViewModel(invoiceRecord)
     : null;
 
+  // Static "Bill To" recipient details — sourced from the central branding config
+  // so the invoice letterhead follows the configured (placeholder) company identity.
   const staticBillToDetails = {
     companyName: branding.companyName,
     addressLine1: branding.addressLine1,

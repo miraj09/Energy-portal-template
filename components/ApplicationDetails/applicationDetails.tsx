@@ -44,6 +44,32 @@ import {
 } from "@/composable/meterQuoteForm";
 import { toast } from "sonner";
 
+/** Resolve company-linked quote header id from application detail payload. */
+function resolveCompanyQuoteId(
+  company: CompanyApiResponse | null
+): number | null {
+  if (!company) return null;
+
+  if (typeof company.quote_id === "number" && Number.isFinite(company.quote_id)) {
+    return company.quote_id;
+  }
+
+  const quote = company.quote;
+  if (typeof quote === "number" && Number.isFinite(quote)) {
+    return quote;
+  }
+  if (
+    quote &&
+    typeof quote === "object" &&
+    typeof quote.id === "number" &&
+    Number.isFinite(quote.id)
+  ) {
+    return quote.id;
+  }
+
+  return null;
+}
+
 const ApplicationDetails = ({ id }: { id: string }) => {
   const router = useRouter();
   const [applicationDetails, setApplicationDetails] =
@@ -427,6 +453,7 @@ const ApplicationDetails = ({ id }: { id: string }) => {
         applicationId={applicationDetails?.lead_id.toString() || "N/A"}
         companyId={applicationDetails?.id || id}
         isSubmitted={applicationDetails?.is_submitted || false}
+        sites={applicationDetails?.sites || []}
         // Pass through any existing DocuSign envelope so the header
         // can switch its label between "Send" and "Re-send"
         envelopeId={applicationDetails?.loa_envelope_id || null}
@@ -519,6 +546,7 @@ const ApplicationDetails = ({ id }: { id: string }) => {
           onClose={() => setIsAddMeterModalOpen(false)}
           companyId={id}
           siteId={selectedSiteId}
+          quoteId={resolveCompanyQuoteId(applicationDetails)}
           siteName={
             applicationDetails?.sites.find((s) => s.id === selectedSiteId)
               ?.sitename || ""

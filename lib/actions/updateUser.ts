@@ -1,8 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { patchResource } from "@/lib/actions/baseMutations";
+import { CURRENT_USER_PERMISSIONS_REVALIDATE_TAG } from "@/lib/constants/revalidateTags";
 
 const updateUserSchema = z.object({
   slug: z.string().min(1),
@@ -15,6 +16,7 @@ const updateUserSchema = z.object({
   image_url: z.string().optional().nullable(),
   password: z.string().optional(),
   is_active: z.boolean().optional(),
+  parent_agent: z.number().nullable().optional(),
 });
 
 export async function updateUser(data: unknown) {
@@ -33,6 +35,9 @@ export async function updateUser(data: unknown) {
     const result = await patchResource(`api/v1/auth/web/user/${slug}/`, payload);
     revalidatePath("/users/user-list");
     revalidatePath("/users/add-user");
+    // Reassigning or detaching parent_agent changes the user's inherited
+    // permissions; without this the sidebar keeps the cached set until next login.
+    updateTag(CURRENT_USER_PERMISSIONS_REVALIDATE_TAG);
     return {
       success: true,
       data: result.data || result,

@@ -57,7 +57,7 @@ export const SubmenuTooltip = ({
                 <span className="mr-2">
                   <div className="w-2 h-2 rounded-full bg-current opacity-50" />
                 </span>
-                <span className="font-['Inter'] text-sm">{subItem.label}</span>
+                <span className="font-['Arial',Helvetica,sans-serif] text-sm">{subItem.label}</span>
               </Button>
             ))}
           </div>

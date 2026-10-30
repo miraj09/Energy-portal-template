@@ -131,10 +131,10 @@ export const NotesAttachmentsModal = ({
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold text-[#363636] font-['Plus_Jakarta_Sans']">
+              <h2 className="text-lg font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
                 {companyName}
               </h2>
-              <p className="text-sm text-[#737373] font-['Inter']">
+              <p className="text-sm text-[#737373] font-['Arial',Helvetica,sans-serif]">
                 {subtitle}
               </p>
             </div>
@@ -216,7 +216,7 @@ export const NotesAttachmentsModal = ({
               )}
               {/* Attachments Section */}
               <div className="mb-8 px-4">
-                <h3 className="text-sm font-medium text-[#363636] mb-3 font-['Inter']">
+                <h3 className="text-sm font-medium text-[#363636] mb-3 font-['Arial',Helvetica,sans-serif]">
                   Attachments:
                 </h3>
                 <Card className="border border-gray-200 w-3/4">
@@ -276,9 +276,9 @@ export const NotesAttachmentsModal = ({
               {/* Notes Section */}
               <Card className="w-full shadow-md py-4">
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3 sm:gap-0">
-                  <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Plus_Jakarta_Sans',Helvetica]">
+                  <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
                     Notes
-                    <span className="text-sm text-[#737373] font-['Inter']">
+                    <span className="text-sm text-[#737373] font-['Arial',Helvetica,sans-serif]">
                       (view)
                     </span>
                   </CardTitle>
@@ -306,16 +306,16 @@ export const NotesAttachmentsModal = ({
                                       note.id === 2
                                         ? "text-sm sm:text-lg leading-[18px] sm:leading-[25px]"
                                         : "text-sm sm:text-lg leading-[18px] sm:leading-5"
-                                    } [font-family:'Inter',Helvetica]`}
+                                    } font-['Arial',Helvetica,sans-serif]`}
                                   >
                                     {note.author}
                                   </h3>
-                                  <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] [font-family:'Inter',Helvetica] self-start sm:self-auto whitespace-nowrap">
+                                  <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] font-['Arial',Helvetica,sans-serif] self-start sm:self-auto whitespace-nowrap">
                                     {note.timestamp}
                                   </span>
                                 </div>
                                 <div
-                                  className={`text-xs text-black [font-family:'Inter',Helvetica] mt-2 sm:mt-4 break-words leading-relaxed`}
+                                  className={`text-xs text-black font-['Arial',Helvetica,sans-serif] mt-2 sm:mt-4 break-words leading-relaxed`}
                                 >
                                   {note.content}
                                 </div>
@@ -327,7 +327,7 @@ export const NotesAttachmentsModal = ({
                                     alt="Line"
                                     src="/line-7.svg"
                                   /> */}
-                                  <span className="ml-[15px] text-[8px] text-neutral-500 [font-family:'Inter',Helvetica]">
+                                  <span className="ml-[15px] text-[8px] text-neutral-500 font-['Arial',Helvetica,sans-serif]">
                                     {note.timestamp}
                                   </span>
                                 </div>
@@ -344,7 +344,7 @@ export const NotesAttachmentsModal = ({
                 </ScrollArea>
                 {showAddNoteInput && (
                   <div className="px-3 sm:px-5 py-2">
-                    <label htmlFor="add-note" className="text-sm text-[#363636] font-['Inter']">Add Note</label>
+                    <label htmlFor="add-note" className="text-sm text-[#363636] font-['Arial',Helvetica,sans-serif]">Add Note</label>
                     <textarea
                       name="add-note"
                       className="w-full border border-gray-300 rounded-md p-2 text-sm"

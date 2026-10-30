@@ -21,9 +21,9 @@ const CallbacksSection: React.FC<CallbacksSectionProps> = ({ callbacks }) => {
         ) : (
           <Card className="w-full  shadow-md py-4">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3 sm:gap-0">
-              <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Plus_Jakarta_Sans',Helvetica]">
+              <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
                 Callbacks
-                <span className="text-sm text-[#737373] font-['Inter']">
+                <span className="text-sm text-[#737373] font-['Arial',Helvetica,sans-serif]">
                   (View)
                 </span>
               </CardTitle>
@@ -39,7 +39,7 @@ const CallbacksSection: React.FC<CallbacksSectionProps> = ({ callbacks }) => {
                       <div className="p-2 sm:p-2.5">
                         <div className="flex flex-col gap-2 sm:gap-0">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                            <h3 className="font-semibold text-black text-sm sm:text-lg leading-5 [font-family:'Inter',Helvetica]">
+                            <h3 className="font-semibold text-black text-sm sm:text-lg leading-5 font-['Arial',Helvetica,sans-serif]">
                               {cb.type} — {cb.date} {cb.time}
                             </h3>
                             <div className="flex flex-wrap gap-2">
@@ -55,11 +55,11 @@ const CallbacksSection: React.FC<CallbacksSectionProps> = ({ callbacks }) => {
                               )} */}
                             </div>
                           </div>
-                          <div className="text-xs text-black [font-family:'Inter',Helvetica] text-[16px] mt-2 sm:mt-4 break-words leading-relaxed">
+                          <div className="text-xs text-black font-['Arial',Helvetica,sans-serif] text-[16px] mt-2 sm:mt-4 break-words leading-relaxed">
                             {cb.note}
                           </div>
                           <div className="mt-2 sm:mt-4">
-                            <span className="text-[14px] text-neutral-600 [font-family:'Inter',Helvetica] font-semibold">
+                            <span className="text-[14px] text-neutral-600 font-['Arial',Helvetica,sans-serif] font-semibold">
                               Contact: {cb.contact}
                             </span>
                           </div>

@@ -79,7 +79,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
       borderColor: "#363636",
     },
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -126,7 +126,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
       : "white",
     color: state.isSelected ? "white" : "#363636",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -141,7 +141,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
     ...provided,
     color: "#363636",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -153,7 +153,7 @@ const customSelectStyles: StylesConfig<SupplierOption> = {
     ...provided,
     color: "#999",
     fontSize: "12px",
-    fontFamily: "Inter, Helvetica",
+    fontFamily: "Arial, Helvetica, sans-serif",
     "@media (min-width: 640px)": {
       fontSize: "13px",
     },
@@ -559,11 +559,11 @@ export const QuoteDetailsModal = ({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
         <div className="p-4 lg:p-6">
             <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 lg:mb-8 gap-4">
-              <h2 className="font-['Plus_Jakarta_Sans'] font-semibold text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-3xl leading-5">
+              <h2 className="font-['Arial',Helvetica,sans-serif] font-semibold text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-3xl leading-5">
                 Edit Electricity Quote
               </h2>
               <div className="flex items-center gap-2">
-                <span className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6">
+                <span className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6">
                   Customer View:
                 </span>
                 <Switch
@@ -577,7 +577,7 @@ export const QuoteDetailsModal = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left column - Current meter details */}
               <div>
-                <h3 className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
+                <h3 className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
                   <span className="text-[#48505e]">Current meter details</span>
                   <span className="text-[#dc3739]">*</span>
                 </h3>
@@ -586,12 +586,12 @@ export const QuoteDetailsModal = ({
                   <CardContent className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
                     {/* MPAN Section */}
                     <div className="space-y-1.5 sm:space-y-2">
-                      <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                      <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                         MPAN:
                       </label>
                       <div className="flex flex-row space-y-0">
                         <div className="w-[40px] sm:w-[50px] xl:w-[55px] h-[40px] sm:h-[47px] lg:h-[54px] flex items-center justify-center bg-white border-[0.8px] border-r-0 border-solid border-[#363636] shadow-[0px_1px_2px_rgba(16,24,40,0.05)]">
-                          <span className="font-['Inter'] font-medium text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-4xl leading-6">
+                          <span className="font-['Arial',Helvetica,sans-serif] font-medium text-[#363636] text-lg sm:text-xl lg:text-2xl xl:text-4xl leading-6">
                             S
                           </span>
                         </div>
@@ -617,7 +617,7 @@ export const QuoteDetailsModal = ({
                                     }
                                     maxLength={item.maxLength}
                                     placeholder={item.value}
-                                    className="h-full border-0 rounded-none text-center font-['Inter'] font-medium text-gray-500 text-xs sm:text-sm lg:text-base leading-6 bg-transparent focus:ring-0 focus:border-0 p-0 placeholder:text-gray-200 placeholder:font-light"
+                                    className="h-full border-0 rounded-none text-center font-['Arial',Helvetica,sans-serif] font-medium text-gray-500 text-xs sm:text-sm lg:text-base leading-6 bg-transparent focus:ring-0 focus:border-0 p-0 placeholder:text-gray-200 placeholder:font-light"
                                   />
                                 </div>
                               ))}
@@ -647,7 +647,7 @@ export const QuoteDetailsModal = ({
                                     }
                                     maxLength={item.maxLength}
                                     placeholder={item.value}
-                                    className="h-full border-0 rounded-none text-center font-['Inter'] font-medium text-xs sm:text-sm lg:text-base leading-6 bg-transparent focus:ring-0 focus:border-0 p-0 placeholder:text-gray-200 placeholder:font-light"
+                                    className="h-full border-0 rounded-none text-center font-['Arial',Helvetica,sans-serif] font-medium text-xs sm:text-sm lg:text-base leading-6 bg-transparent focus:ring-0 focus:border-0 p-0 placeholder:text-gray-200 placeholder:font-light"
                                   />
                                 </div>
                               ))}
@@ -659,7 +659,7 @@ export const QuoteDetailsModal = ({
 
                     {/* Current Supplier */}
                     <div className="space-y-1.5 sm:space-y-2">
-                      <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                      <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                         Current Supplier:
                       </label>
                       <Select<SupplierOption>
@@ -683,7 +683,7 @@ export const QuoteDetailsModal = ({
 
                     {/* Contract Start Date */}
                     <div className="space-y-1.5 sm:space-y-2">
-                      <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                      <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                         Contract Start Date:
                       </label>
                       <CustomDateInput 
@@ -702,7 +702,7 @@ export const QuoteDetailsModal = ({
 
               {/* Right column - Current rates & charges */}
               <div>
-                <h3 className="font-['Inter'] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
+                <h3 className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-sm sm:text-base lg:text-lg xl:text-xl leading-6 mb-4">
                   <span className="text-[#48505e]">
                     Current rates & charges
                   </span>
@@ -715,7 +715,7 @@ export const QuoteDetailsModal = ({
                       {/* Row 1: Number of Days (top), Current Standing Charge (bottom) */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             Number of Days:
                           </label>
                           <Input
@@ -728,7 +728,7 @@ export const QuoteDetailsModal = ({
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             Current Standing Charge:
                           </label>
                           <div className="relative">
@@ -739,7 +739,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("currentStandingCharge", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 P
                               </span>
                             </div>
@@ -750,7 +750,7 @@ export const QuoteDetailsModal = ({
                       {/* Row 2: Day */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             Day:
                           </label>
                           <div className="relative">
@@ -761,7 +761,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("dayRate", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 P
                               </span>
                             </div>
@@ -777,7 +777,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("dayKwh", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-[55px] h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 Kwh
                               </span>
                             </div>
@@ -788,7 +788,7 @@ export const QuoteDetailsModal = ({
                       {/* Row 3: Night */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             Night:
                           </label>
                           <div className="relative">
@@ -799,7 +799,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("nightRate", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 P
                               </span>
                             </div>
@@ -815,7 +815,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("nightKwh", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-[55px] h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 Kwh
                               </span>
                             </div>
@@ -826,7 +826,7 @@ export const QuoteDetailsModal = ({
                       {/* Row 4: EW */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             EW:
                           </label>
                           <div className="relative">
@@ -837,7 +837,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("ewRate", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 P
                               </span>
                             </div>
@@ -853,7 +853,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("ewKwh", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-[55px] h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 Kwh
                               </span>
                             </div>
@@ -864,7 +864,7 @@ export const QuoteDetailsModal = ({
                       {/* Row 5: Winter */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col space-y-2">
-                          <label className="font-['Inter'] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
+                          <label className="font-['Arial',Helvetica,sans-serif] font-medium text-gray-700 text-xs sm:text-sm lg:text-base leading-6">
                             Winter:
                           </label>
                           <div className="relative">
@@ -875,7 +875,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("winterRate", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-8.75 h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 P
                               </span>
                             </div>
@@ -891,7 +891,7 @@ export const QuoteDetailsModal = ({
                               onChange={(e) => handleInputChange("winterKwh", e.target.value)}
                             />
                             <div className="absolute right-0 top-0 w-[55px] h-8.75 bg-[#346fb6] flex items-center justify-center rounded-r-md">
-                              <span className="font-['Inter'] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
+                              <span className="font-['Arial',Helvetica,sans-serif] font-medium text-white text-base sm:text-lg lg:text-xl leading-6">
                                 Kwh
                               </span>
                             </div>

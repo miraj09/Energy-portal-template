@@ -56,6 +56,7 @@ export function authMiddleware(request: NextRequest) {
     "/tickets",
     "/tpi-document",
     "/users",
+    "/website-enquiries",
   ];
 
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));

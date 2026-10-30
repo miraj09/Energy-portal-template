@@ -81,6 +81,12 @@ export const sidebarMenuConfig: SidebarMenuItem[] = [
     ],
   },
   {
+    id: "website-enquiries",
+    label: "Website Enquiries",
+    href: "/website-enquiries",
+    permission_code: sidebarPermission("view_website_enquiries"),
+  },
+  {
     id: "docusign",
     label: "DocuSign",
     href: "/docusign",

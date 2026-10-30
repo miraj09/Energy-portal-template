@@ -830,7 +830,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
             totalSteps={totalSteps}
             stepTitles={stepTitles}
           />
-          <h1 className="font-semibold text-[#363636] text-xl sm:text-2xl tracking-[0] leading-5 font-['Plus_Jakarta_Sans',Helvetica] mb-6 lg:mb-8">
+          <h1 className="font-semibold text-[#363636] text-xl sm:text-2xl tracking-[0] leading-5 font-['Arial',Helvetica,sans-serif] mb-6 lg:mb-8">
             Create New Company
           </h1>
 
@@ -852,7 +852,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                   />
                   <Label
                     htmlFor="existing"
-                    className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Inter',Helvetica]"
+                    className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   >
                     Existing Company
                   </Label>
@@ -865,7 +865,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                   />
                   <Label
                     htmlFor="new"
-                    className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Inter',Helvetica]"
+                    className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   >
                     New Company
                   </Label>
@@ -876,7 +876,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
               <>
                 {/* Post Code */}
                 <div className="w-full lg:max-w-1/3">
-                  <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                  <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                     Post Code <span className="text-red-500">*</span>
                   </Label>
                   <div className="flex">
@@ -904,7 +904,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                 {/* Location List (Dropdown) - Only show when postcode is provided and find is clicked */}
                 {showLocationDropdown && (
                   <div className="w-full max-w-md">
-                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm text-[#48505E] tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Location List <span className="text-red-500">*</span>
                     </Label>
                     <CustomSelect
@@ -924,11 +924,11 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                 {/* Company Name - Only show when company is selected */}
                 {form.location && (
                   <div className="w-full max-w-md">
-                    <Label className="block font-medium text-sm tracking-[0] text-[#48505e] leading-6 font-['Inter',Helvetica] mb-2">
+                    <Label className="block font-medium text-sm tracking-[0] text-[#48505e] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                       Company Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
-                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica] ${
+                      className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${
                         validationErrors.companyName ? 'border-red-500' : 'border-neutral-500'
                       }`}
                       placeholder=""
@@ -949,7 +949,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                 {/* Address - Only show when company is selected */}
                 {form.location && (
                   <div className="w-full lg:w-3/4">
-                    <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-3">
+                    <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-3">
                       Address
                     </Label>
                     <div className="bg-[#ffffff] rounded-lg border border-solid border-[#c4c4c4] p-4 lg:p-6">
@@ -986,7 +986,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
               {/* Is Micro-Business */}
               <div className="w-full max-w-md">
                 <div className="flex items-center justify-between">
-                  <Label className="font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica]">
+                  <Label className="font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]">
                     Is Micro-Business
                   </Label>
                   <Switch
@@ -1001,11 +1001,11 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
 
               {/* Number of Employees */}
               <div className="w-full max-w-md">
-                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Number of Employees
                 </Label>
                 <Input
-                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   placeholder="500"
                   value={form.employees}
                   onChange={(e) => handleInput("employees", e.target.value)}
@@ -1015,11 +1015,11 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
 
               {/* Estimated Turnover */}
               <div className="w-full max-w-md">
-                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Estimated Turnover
                 </Label>
                 <Input
-                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                  className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                   placeholder="5000"
                   value={form.turnover}
                   onChange={(e) => handleInput("turnover", e.target.value)}
@@ -1030,11 +1030,11 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
               {/* Registration No - Only show when business type is Limited Company */}
               {(((form.businessType?.label || "").toLowerCase() === "limited company") || form.businessType?.value === "3" || form.businessType?.value === "limited-company") && (
                 <div className="w-full max-w-md">
-                  <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                  <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                     Registration No
                   </Label>
                   <Input
-                    className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Inter',Helvetica]"
+                    className="w-full h-[35px] bg-white rounded border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs px-[15px] py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                     placeholder="163245051423"
                     value={form.regNo}
                     onChange={(e) => handleInput("regNo", e.target.value)}
@@ -1047,7 +1047,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
             <>
               {/* Company Name (Dropdown) */}
               <div className="w-full max-w-md">
-                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Company Name <span className="text-red-500">*</span>
                   {companyNameLoading && (
                     <span className="ml-2 text-sm text-gray-500">(Loading...)</span>
@@ -1106,7 +1106,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                     />
                     <Label
                       htmlFor="site-existing"
-                      className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Inter',Helvetica]"
+                      className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                     >
                       Existing Site
                     </Label>
@@ -1119,7 +1119,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                     />
                     <Label
                       htmlFor="site-new"
-                      className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Inter',Helvetica]"
+                      className="font-medium text-[#383e49] text-base tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif]"
                     >
                       New Site
                     </Label>
@@ -1129,7 +1129,7 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
 
               {/* Site (Dropdown) */}
               {/* <div className="w-full max-w-md">
-                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Inter',Helvetica] mb-2">
+                <Label className="block font-medium text-sm tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] mb-2">
                   Site
                 </Label>
                 <CustomSelect

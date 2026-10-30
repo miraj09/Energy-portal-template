@@ -72,7 +72,7 @@ export default function NewPasswordForm(): JSX.Element {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f7faff] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="w-full flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="relative w-full max-w-[749px]">
         <Card className="relative mt-[50px] sm:mt-[60px] lg:mt-[70px] shadow-[0px_4px_20px_rgba(0,0,0,0.25)] rounded-[10px]">
           <CardContent className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-48 py-8 sm:py-10 lg:py-14">
@@ -215,10 +215,9 @@ export default function NewPasswordForm(): JSX.Element {
           <Image
             width={187}
             height={70}
-            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-contain"
+            className="w-[150px] sm:w-[170px] lg:w-[187px] h-[55px] sm:h-[65px] lg:h-[70px] object-cover"
             alt={branding.logoAlt}
             src={branding.logoSrc}
-            unoptimized
           />
         </div>
       </div>

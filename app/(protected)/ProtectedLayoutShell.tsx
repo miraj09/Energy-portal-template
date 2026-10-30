@@ -58,7 +58,7 @@ const ProtectedLayoutContent = ({ children }: { children: React.ReactNode }) => 
         <div className="p-6">
           <Button
             variant="ghost"
-            className={`w-full justify-start gap-4 text-[14px] leading-[140%] tracking-[0px] text-[#346fb6] font-['Noto_Sans_Lao'] ${
+            className={`w-full justify-start gap-4 text-[14px] leading-[140%] tracking-[0px] text-[#346fb6] font-['Arial',Helvetica,sans-serif] ${
               isSidebarCollapsed ? "justify-center px-0" : ""
             }`}
             onClick={() => setShowLogoutConfirmation(true)}

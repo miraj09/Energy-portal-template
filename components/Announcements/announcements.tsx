@@ -80,7 +80,7 @@ const Announcements = ({
     <div className="p-4 sm:p-6 lg:p-8 w-full">
       <Card className="w-full shadow-md bg-white mt-5">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Plus_Jakarta_Sans',Helvetica]">
+          <CardTitle className="text-xl sm:text-2xl font-semibold text-[#363636] font-['Arial',Helvetica,sans-serif]">
             All Announcements
           </CardTitle>
         </CardHeader>
@@ -104,19 +104,19 @@ const Announcements = ({
                     <CardContent className="p-0 relative">
                       <div className="p-2 sm:p-2.5">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                          <h3 className="font-semibold text-black text-base sm:text-lg leading-4 sm:leading-5 w-full sm:w-[484px] [font-family:'Inter',Helvetica]">
+                          <h3 className="font-semibold text-black text-base sm:text-lg leading-4 sm:leading-5 w-full sm:w-[484px] font-['Arial',Helvetica,sans-serif]">
                             {announcement.subject}
                           </h3>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 self-start sm:self-auto">
-                            <span className="text-xs sm:text-sm text-primary font-medium bg-primary/10 px-2 py-1 rounded-md [font-family:'Inter',Helvetica]">
+                            <span className="text-xs sm:text-sm text-primary font-medium bg-primary/10 px-2 py-1 rounded-md font-['Arial',Helvetica,sans-serif]">
                               {announcement.category}
                             </span>
-                            <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] [font-family:'Inter',Helvetica]">
+                            <span className="text-xs sm:text-sm text-neutral-500 [-webkit-text-stroke:1px_#737373] font-['Arial',Helvetica,sans-serif]">
                               {formatDate(announcement.created_at)}
                             </span>
                           </div>
                         </div>
-                        <div className="text-xs text-black [font-family:'Inter',Helvetica] mt-3 sm:mt-4 w-full sm:w-[1025px]">
+                        <div className="text-xs text-black font-['Arial',Helvetica,sans-serif] mt-3 sm:mt-4 w-full sm:w-[1025px]">
                           {renderHtmlContent(announcement.message)}
                         </div>
                         <div className="mt-3 sm:mt-4 relative">
@@ -127,7 +127,7 @@ const Announcements = ({
                             alt="Line"
                             src="/line-7.svg"
                           /> */}
-                          <span className="ml-[15px] text-[8px] text-neutral-500 [font-family:'Inter',Helvetica] hidden">
+                          <span className="ml-[15px] text-[8px] text-neutral-500 font-['Arial',Helvetica,sans-serif] hidden">
                             {formatTimestamp(announcement.created_at)}
                           </span>
                         </div>

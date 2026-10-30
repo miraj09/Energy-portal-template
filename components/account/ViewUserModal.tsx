@@ -25,6 +25,14 @@ export default function ViewUserModal({ isOpen, onClose, data }: ViewUserModalPr
             <span className="font-medium">Roles:</span>{" "}
             {(data.role_details || []).map((role) => role.name).join(", ") || "No role assigned"}
           </p>
+          <p>
+            <span className="font-medium">Reports to:</span>{" "}
+            {data.parent_agent_details?.name || "N/A"}
+          </p>
+          <p>
+            <span className="font-medium">Sub-agents:</span>{" "}
+            {(data.sub_agents || []).map((agent) => agent.name).join(", ") || "None"}
+          </p>
         </div>
       </DialogContent>
     </Dialog>

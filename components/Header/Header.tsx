@@ -221,7 +221,7 @@ export const Header = (): JSX.Element => {
 
                     <div className="hidden sm:flex flex-col items-start justify-center gap-1">
                       <div className="flex items-center justify-center gap-2.5">
-                        <span className="font-['Lato'] font-[800] text-gray-500 text-xs sm:text-[14px]">
+                        <span className="font-['Arial',Helvetica,sans-serif] font-[800] text-gray-500 text-xs sm:text-[14px]">
                           {displayName}
                         </span>
                         <ChevronDownIcon className="w-4 h-4 sm:w-5 sm:h-5 absolute right-2 sm:right-3 text-gray-500" />
@@ -229,7 +229,7 @@ export const Header = (): JSX.Element => {
 
                       <div className="flex items-center justify-center gap-2.5">
                         <span
-                          className="max-w-[140px] truncate font-['Lato'] font-[500] text-gray-500 text-[10px] sm:text-[12px]"
+                          className="max-w-[140px] truncate font-['Arial',Helvetica,sans-serif] font-[500] text-gray-500 text-[10px] sm:text-[12px]"
                           title={roleNames || undefined}
                         >
                           {roleLabel}
@@ -280,10 +280,9 @@ export const Header = (): JSX.Element => {
               <Image
                 width={139}
                 height={52}
-                className="w-[139px] h-[52px] object-contain"
+                className="w-[139px] h-[52px] object-cover"
                 alt={branding.logoAlt}
                 src={branding.logoSrc}
-                unoptimized
               />
               <Button
                 variant="ghost"
@@ -300,7 +299,7 @@ export const Header = (): JSX.Element => {
             <div className="p-4 border-t">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-4 text-[#346fb6] font-['Noto_Sans_Lao'] text-[14px] tracking-[0px] leading-[140%]"
+                className="w-full justify-start gap-4 text-[#346fb6] font-['Arial',Helvetica,sans-serif] text-[14px] tracking-[0px] leading-[140%]"
                 onClick={handleLogoutClick}
                 disabled={isPending}
               >

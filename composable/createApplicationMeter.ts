@@ -14,6 +14,11 @@ export interface CreateApplicationMeterBasicPayload {
   site_id: number;
   meter_type: "Electricity" | "Gas";
   meter_reference: string;
+  /**
+   * Company-linked quote header id from application details.
+   * Sent as `quote` on POST /meter/.
+   */
+  quote?: number;
 }
 
 export interface CreateApplicationMeterPayload
@@ -119,7 +124,8 @@ function resolveMeterTypeId(meterType: "Electricity" | "Gas"): number {
 
 /**
  * Create a meter with only site, type, and reference.
- * The API auto-creates a linked quote-header; patch rates separately if needed.
+ * When `quote` is provided (company quote from application details), it is sent
+ * as the `quote` FK on create.
  */
 export async function createApplicationMeterBasic(
   payload: CreateApplicationMeterBasicPayload
@@ -129,6 +135,7 @@ export async function createApplicationMeterBasic(
       site: payload.site_id,
       meter_type: resolveMeterTypeId(payload.meter_type),
       meter_reference: payload.meter_reference,
+      ...(payload.quote != null ? { quote: payload.quote } : {}),
     },
     CREATE_METER_ENDPOINT
   );
@@ -141,7 +148,8 @@ export async function createApplicationMeterBasic(
     };
   }
 
-  const quoteId = extractQuoteIdFromApiResponse(response.data) ?? undefined;
+  const quoteId =
+    extractQuoteIdFromApiResponse(response.data) ?? payload.quote ?? undefined;
 
   return {
     success: true,
@@ -151,12 +159,19 @@ export async function createApplicationMeterBasic(
 }
 
 /**
- * Create a meter, then PATCH the auto-created quote-header with flat rate fields.
+ * Create a meter, then PATCH the auto-created (or linked) quote-header with flat rate fields.
  */
 export async function createApplicationMeter(
   payload: CreateApplicationMeterPayload
 ): Promise<CreateApplicationMeterResponse> {
-  const meterResponse = await createApplicationMeterBasic(payload);
+  const meterResponse = await createApplicationMeterBasic({
+    company_id: payload.company_id,
+    site_id: payload.site_id,
+    meter_type: payload.meter_type,
+    meter_reference: payload.meter_reference,
+    // Prefer explicit quote on basic payload; fall back to quote_id from edit/create callers.
+    quote: payload.quote ?? payload.quote_id,
+  });
 
   if (!meterResponse.success) {
     return meterResponse;
@@ -164,6 +179,8 @@ export async function createApplicationMeter(
 
   const quoteId =
     meterResponse.quoteId ??
+    payload.quote ??
+    payload.quote_id ??
     extractQuoteIdFromApiResponse(meterResponse.data) ??
     null;
 
