@@ -12,6 +12,10 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { toast } from "sonner";
 import { createApplicationSite } from "@/composable/createApplicationSite";
+import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
 
 interface AddSiteModalProps {
   isOpen: boolean;
@@ -105,6 +109,12 @@ const AddSiteModal: React.FC<AddSiteModalProps> = ({
     if (!form.postcode.trim()) {
       errors.postcode = "Postcode is required";
       hasErrors = true;
+    } else {
+      const postcodeFormatError = getUkPostcodeFormatError(form.postcode);
+      if (postcodeFormatError) {
+        errors.postcode = postcodeFormatError;
+        hasErrors = true;
+      }
     }
 
     if (!form.address_line_1.trim()) {
@@ -215,7 +225,7 @@ const AddSiteModal: React.FC<AddSiteModalProps> = ({
             <Input
               value={form.postcode}
               onChange={(e) => updateField("postcode", e.target.value)}
-              placeholder="Enter postcode"
+              placeholder={UK_POSTCODE_PLACEHOLDER}
               className="border-[#363636]"
             />
             {fieldErrors.postcode ? (

@@ -1,5 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UkPostcodeInput } from "@/components/form/UkPostcodeInput";
+import { getUkPostcodeFormatError } from "@/lib/validation/ukPostcode";
 import {
   Table,
   TableHeader,
@@ -55,6 +57,7 @@ const ExportContractTable = () => {
     businessName: "",
     leadStatus: "",
   });
+  const [showPostcodeFormatError, setShowPostcodeFormatError] = useState(false);
 
   // Company filter: paginated dropdown (same pattern as TicketForm / SoldTariffFormPage1)
   const [companyOptions, setCompanyOptions] = useState<SelectOption[]>([]);
@@ -266,6 +269,12 @@ const ExportContractTable = () => {
   };
 
   const handleApplyAdvancedFilters = () => {
+    const postcodeFormatError = getUkPostcodeFormatError(
+      advancedFilterInputs.postcode
+    );
+    setShowPostcodeFormatError(true);
+    if (postcodeFormatError) return;
+
     setFilters((prev) => {
       const next: TableFilters = { ...prev };
 
@@ -293,6 +302,7 @@ const ExportContractTable = () => {
   };
 
   const handleClearAdvancedFilters = () => {
+    setShowPostcodeFormatError(false);
     setAdvancedFilterInputs({
       mpanMprn: "",
       postcode: "",
@@ -682,13 +692,12 @@ const ExportContractTable = () => {
               <label className="text-sm font-medium text-gray-700 mb-1">
                 Post Code
               </label>
-              <input
-                type="text"
+              <UkPostcodeInput
                 value={advancedFilterInputs.postcode}
-                onChange={(e) =>
-                  handleAdvancedFilterInputChange("postcode", e.target.value)
+                onChange={(value) =>
+                  handleAdvancedFilterInputChange("postcode", value)
                 }
-                placeholder="Enter post code"
+                showError={showPostcodeFormatError}
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>

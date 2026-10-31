@@ -9,6 +9,10 @@ import CustomDateInput from "@/ui/customDateInput";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
+import {
   createApplicationMeter,
   CreateApplicationMeterPayload,
   extractMeterIdFromApiResponse,
@@ -358,6 +362,12 @@ export const QuoteDetailsSection = ({
     if (!postcode.trim()) {
       setFieldErrors(prev => ({ ...prev, postcode: "Postcode is required" }));
       hasErrors = true;
+    } else {
+      const postcodeFormatError = getUkPostcodeFormatError(postcode);
+      if (postcodeFormatError) {
+        setFieldErrors(prev => ({ ...prev, postcode: postcodeFormatError }));
+        hasErrors = true;
+      }
     }
 
     // Check contract start date
@@ -597,7 +607,7 @@ export const QuoteDetailsSection = ({
                       Postcode:
                     </label>
                     <Input
-                      placeholder="Enter postcode"
+                      placeholder={UK_POSTCODE_PLACEHOLDER}
                       value={postcode}
                       onChange={(e) => {
                         setPostcode(e.target.value);

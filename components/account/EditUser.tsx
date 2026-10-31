@@ -11,6 +11,10 @@ import { Label } from "@/ui/label";
 import ParentAgentSelect from "@/components/account/ParentAgentSelect";
 import { getFieldError } from "@/lib/utils/fieldErrors";
 import { cn } from "@/lib/utils";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_PLACEHOLDER,
+} from "@/lib/validation/ukPhone";
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm text-gray-900 shadow-sm transition-colors",
@@ -49,6 +53,7 @@ export default function EditUser({
   const initialParentAgent = readParentAgentId(user);
   const [parentAgent, setParentAgent] = useState<number | null>(initialParentAgent);
   const [parentAgentError, setParentAgentError] = useState<string | undefined>();
+  const [phoneError, setPhoneError] = useState<string | undefined>();
 
   const roleOptions: SelectOption[] = rolesData.map((role) => ({
     value: String(role.id),
@@ -57,6 +62,13 @@ export default function EditUser({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const phoneFormatError = getUkPhoneFormatError(phone);
+    if (phoneFormatError) {
+      setPhoneError(phoneFormatError);
+      toast.error(phoneFormatError);
+      return;
+    }
+    setPhoneError(undefined);
     setIsSubmitting(true);
     setParentAgentError(undefined);
     const result = await updateUser({
@@ -100,7 +112,30 @@ export default function EditUser({
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <Label htmlFor="edit-phone">Phone</Label>
-          <Input id="edit-phone" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <Input
+            id="edit-phone"
+            type="tel"
+            inputMode="tel"
+            placeholder={UK_PHONE_PLACEHOLDER}
+            className="mt-1"
+            value={phone}
+            onChange={(event) => {
+              const nextPhone = event.target.value;
+              setPhone(nextPhone);
+              setPhoneError((currentError) =>
+                currentError
+                  ? getUkPhoneFormatError(nextPhone) ?? undefined
+                  : currentError
+              );
+            }}
+            onBlur={(event) =>
+              setPhoneError(getUkPhoneFormatError(event.target.value) ?? undefined)
+            }
+            aria-invalid={phoneError ? true : undefined}
+          />
+          {phoneError ? (
+            <p className="mt-1 text-xs text-red-600">{phoneError}</p>
+          ) : null}
         </div>
         <div>
           <Label htmlFor="edit-status">Status</Label>

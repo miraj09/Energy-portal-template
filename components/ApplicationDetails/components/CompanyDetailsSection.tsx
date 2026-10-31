@@ -9,6 +9,10 @@ import { patchMethod } from "@/lib/actions/patchMethod";
 import { getDropdown } from "@/lib/actions/getDropdown";
 import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
 import { getApiErrorMessage } from "@/composable/getApiErrorMessage";
+import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
 
 // Yes/No options for micro business
 const microBusinessOptions: SelectOption[] = [
@@ -51,6 +55,7 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [postcodeError, setPostcodeError] = useState("");
   const [businessTypeOptions, setBusinessTypeOptions] = useState<
     SelectOption[]
   >([]);
@@ -175,6 +180,8 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
       value: company.current_postcode,
       type: "input",
       key: "current_postcode",
+      placeholder: UK_POSTCODE_PLACEHOLDER,
+      error: postcodeError,
     },
     // Address field - shows combined when not editing, separate fields when editing
     ...(isEditing
@@ -244,6 +251,11 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
     } else {
       setCompany((prev) => ({ ...prev, [key]: value }));
     }
+    if (key === "current_postcode") {
+      setPostcodeError((currentError) =>
+        currentError ? getUkPostcodeFormatError(value) ?? "" : ""
+      );
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -251,6 +263,16 @@ const CompanyDetailsSection: React.FC<CompanyDetailsSectionProps> = ({
     setIsSaving(true);
 
     try {
+      const postcodeFormatError = getUkPostcodeFormatError(
+        company.current_postcode || ""
+      );
+      if (postcodeFormatError) {
+        setPostcodeError(postcodeFormatError);
+        toast.error(postcodeFormatError);
+        return;
+      }
+      setPostcodeError("");
+
       // Validate required fields
       if (
         !company.company_name ||

@@ -11,6 +11,8 @@ import SoldTariffFormPage4 from "./SoldTariffFormPage4";
 import { postMethod } from "@/lib/actions/postMethod";
 import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
 import { parseTermMonths } from "@/composable/sellApplicationMeterTariff";
+import { getUkPostcodeFormatError } from "@/lib/validation/ukPostcode";
+import { getUkPhoneFormatError } from "@/lib/validation/ukPhone";
 
 // Step titles for the form
 const STEP_TITLES = [
@@ -195,7 +197,14 @@ const SoldTariffForm = () => {
           isValid = false;
           console.log("❌ Post code validation FAILED");
         } else {
-          console.log("✅ Post code validation PASSED");
+          const postcodeFormatError = getUkPostcodeFormatError(form.postCode);
+          if (postcodeFormatError) {
+            errors.postCode = [postcodeFormatError];
+            isValid = false;
+            console.log("❌ Post code format validation FAILED");
+          } else {
+            console.log("✅ Post code validation PASSED");
+          }
         }
 
         // Validate location (required only for new companies)
@@ -231,6 +240,14 @@ const SoldTariffForm = () => {
       if (!form.homePostCode || !form.homePostCode.trim()) {
         errors.homePostCode = ["Home post code is required"];
         isValid = false;
+      } else {
+        const homePostcodeFormatError = getUkPostcodeFormatError(
+          form.homePostCode
+        );
+        if (homePostcodeFormatError) {
+          errors.homePostCode = [homePostcodeFormatError];
+          isValid = false;
+        }
       }
 
       /**
@@ -302,6 +319,12 @@ const SoldTariffForm = () => {
       if (!form.telephoneNumber || !form.telephoneNumber.trim()) {
         errors.telephoneNumber = ["Telephone number is required"];
         isValid = false;
+      } else {
+        const phoneFormatError = getUkPhoneFormatError(form.telephoneNumber);
+        if (phoneFormatError) {
+          errors.telephoneNumber = [phoneFormatError];
+          isValid = false;
+        }
       }
       if (!form.primaryContactEmail || !form.primaryContactEmail.trim()) {
         errors.primaryContactEmail = ["Primary contact email is required"];
@@ -333,6 +356,16 @@ const SoldTariffForm = () => {
       ) {
         errors.billingType = ["Billing type is required"];
         isValid = false;
+      }
+
+      if (form.billingType?.value === "different" && form.billingPostCode.trim()) {
+        const billingPostcodeFormatError = getUkPostcodeFormatError(
+          form.billingPostCode
+        );
+        if (billingPostcodeFormatError) {
+          errors.billingPostCode = [billingPostcodeFormatError];
+          isValid = false;
+        }
       }
     }
 

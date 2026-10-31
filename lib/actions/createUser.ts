@@ -10,11 +10,20 @@ import {
   mapLoginUserData,
   type TokenUserPayload,
 } from "@/lib/user/mapLoginUserData";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_FORMAT_ERROR,
+} from "@/lib/validation/ukPhone";
 
 const createUserSchema = z.object({
   name: z.string().min(1),
   email: z.email(),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .optional()
+    .refine((value) => !value?.trim() || getUkPhoneFormatError(value) == null, {
+      message: UK_PHONE_FORMAT_ERROR,
+    }),
   password: z.string().min(8),
   role: z.array(z.number()).min(1),
   gender: z.number().optional(),

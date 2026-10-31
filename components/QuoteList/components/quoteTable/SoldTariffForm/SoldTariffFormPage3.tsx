@@ -8,6 +8,7 @@ import CustomDateInput from "@/ui/customDateInput";
 import type { SoldTariffFormData, ValidationErrors } from "./SoldTariffForm";
 import StepIndicator from "./StepIndicator";
 import { useGetRequest } from "@/composable";
+import { UK_POSTCODE_PLACEHOLDER } from "@/lib/validation/ukPostcode";
 
 interface SoldTariffFormPage3Props {
   form: SoldTariffFormData;
@@ -161,8 +162,8 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                     </Label>
                     <div className="flex">
                       <Input
-                        className="flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid border-neutral-500 shadow-shadow-xs"
-                        placeholder="E6 3BJ"
+                        className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${validationErrors.billingPostCode ? "border-red-500" : "border-neutral-500"}`}
+                        placeholder={UK_POSTCODE_PLACEHOLDER}
                         value={form.billingPostCode}
                         onChange={(e) =>
                           handleInput("billingPostCode", e.target.value)
@@ -172,6 +173,11 @@ const SoldTariffFormPage3: React.FC<SoldTariffFormPage3Props> = ({
                         Find
                       </Button>
                     </div>
+                    {validationErrors.billingPostCode && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {validationErrors.billingPostCode[0]}
+                      </p>
+                    )}
                   </div>
 
                   <div className="w-full max-w-md">

@@ -9,6 +9,10 @@ import { postMethod } from "@/lib/actions/postMethod";
 import { useDeleteApiCall } from "@/composable";
 import { DeleteConfirmationModal } from "@/ui";
 import { getApiErrorMessage } from "@/composable/getApiErrorMessage";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_PLACEHOLDER,
+} from "@/lib/validation/ukPhone";
 
 // Define the InfoField interface locally to match DynamicInfoCard
 interface InfoField {
@@ -21,6 +25,7 @@ interface InfoField {
   searchable?: boolean;
   required?: boolean;
   error?: string;
+  placeholder?: string;
   disabled?: boolean;
   inputType?: "text" | "number" | "email" | "tel";
 }
@@ -87,6 +92,17 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
     }
     if (!contact.telephone1?.trim()) {
       errors.telephone1 = "Phone number is required";
+    } else {
+      const phoneFormatError = getUkPhoneFormatError(contact.telephone1);
+      if (phoneFormatError) {
+        errors.telephone1 = phoneFormatError;
+      }
+    }
+    if (contact.telephone2?.trim()) {
+      const optionalPhoneFormatError = getUkPhoneFormatError(contact.telephone2);
+      if (optionalPhoneFormatError) {
+        errors.telephone2 = optionalPhoneFormatError;
+      }
     }
 
     return errors;
@@ -209,8 +225,19 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
     setEditingContact(updatedContact);
     setHasUnsavedChanges(true);
 
-    // Clear validation error for this field if it exists
-    if (validationErrors[key]) {
+    const isPhoneField = key === "telephone1" || key === "telephone2";
+    if (isPhoneField && validationErrors[key]) {
+      setValidationErrors((prev) => {
+        const nextErrors = { ...prev };
+        const phoneFormatError = getUkPhoneFormatError(value);
+        if (phoneFormatError && value.trim()) {
+          nextErrors[key] = phoneFormatError;
+        } else {
+          delete nextErrors[key];
+        }
+        return nextErrors;
+      });
+    } else if (validationErrors[key]) {
       setValidationErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[key];
@@ -583,7 +610,8 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
         type: "input",
         key: "telephone1",
         required: true,
-        inputType: "number",
+        inputType: "tel",
+        placeholder: UK_PHONE_PLACEHOLDER,
         error:
           validationErrors[`${index}_telephone1`] ||
           validationErrors.telephone1,
@@ -594,7 +622,11 @@ const ContactDetailsSection: React.FC<ContactDetailsSectionProps> = ({
         type: "input",
         key: "telephone2",
         required: false,
-        inputType: "number",
+        inputType: "tel",
+        placeholder: UK_PHONE_PLACEHOLDER,
+        error:
+          validationErrors[`${index}_telephone2`] ||
+          validationErrors.telephone2,
       },
     ];
 

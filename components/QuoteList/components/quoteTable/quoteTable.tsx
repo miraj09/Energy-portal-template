@@ -116,6 +116,40 @@ function normalizeSupplierName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Sort direction for the "Sort By" dropdown; `null` keeps the original API order. */
+type PriceSortOrder = "high" | "low";
+
+const PRICE_SORT_OPTIONS: ReadonlyArray<{
+  value: PriceSortOrder;
+  label: string;
+}> = [
+  { value: "high", label: "Price: High to Low" },
+  { value: "low", label: "Price: Low to High" },
+];
+
+/** Narrows a raw select value to a known sort order; anything else means "unsorted". */
+function toPriceSortOrder(rawValue: string | undefined): PriceSortOrder | null {
+  return PRICE_SORT_OPTIONS.some((option) => option.value === rawValue)
+    ? (rawValue as PriceSortOrder)
+    : null;
+}
+
+/**
+ * Returns a new array ordered by total cost. Never mutates the input so the
+ * unsorted state can be restored when the user clears the dropdown.
+ */
+function sortQuotesByTotalCost(
+  quotes: QuoteDataItem[],
+  sortOrder: PriceSortOrder,
+): QuoteDataItem[] {
+  return [...quotes].sort((firstQuote, secondQuote) => {
+    const difference =
+      parseTotalCostPounds(firstQuote.totalCost) -
+      parseTotalCostPounds(secondQuote.totalCost);
+    return sortOrder === "high" ? -difference : difference;
+  });
+}
+
 export const QuoteTable = ({
   quoteType = "electricity",
   quoteId,
@@ -356,14 +390,26 @@ export const QuoteTable = ({
     return options;
   }, [quoteData]);
 
-  const visibleQuotes = useMemo(() => {
-    if (!selectedSupplier) return quoteData;
+  // Null means "no sort" — rows keep the order they arrived in.
+  const [selectedSortOrder, setSelectedSortOrder] =
+    useState<PriceSortOrder | null>(null);
 
-    const selectedSupplierKey = normalizeSupplierName(selectedSupplier);
-    return quoteData.filter(
-      (quote) => normalizeSupplierName(quote.supplier) === selectedSupplierKey,
-    );
-  }, [quoteData, selectedSupplier]);
+  // Filter by supplier first, then sort, so the sort only touches visible rows.
+  const visibleQuotes = useMemo(() => {
+    let filteredQuotes = quoteData;
+
+    if (selectedSupplier) {
+      const selectedSupplierKey = normalizeSupplierName(selectedSupplier);
+      filteredQuotes = quoteData.filter(
+        (quote) =>
+          normalizeSupplierName(quote.supplier) === selectedSupplierKey,
+      );
+    }
+
+    return selectedSortOrder
+      ? sortQuotesByTotalCost(filteredQuotes, selectedSortOrder)
+      : filteredQuotes;
+  }, [quoteData, selectedSupplier, selectedSortOrder]);
 
   const selectedSupplierOption = selectedSupplier
     ? (supplierOptions.find(
@@ -373,10 +419,9 @@ export const QuoteTable = ({
       ) ?? null)
     : null;
 
-  const sortOptions = [
-    { value: "high", label: "Price: High to Low" },
-    { value: "low", label: "Price: Low to High" },
-  ];
+  const selectedSortOption =
+    PRICE_SORT_OPTIONS.find((option) => option.value === selectedSortOrder) ??
+    null;
 
   const handleShowDetails = async () => {
     if (quoteType === "gas") {
@@ -515,8 +560,14 @@ export const QuoteTable = ({
                 Sort By
               </span>
               <CustomSelect
-                options={sortOptions}
+                options={[...PRICE_SORT_OPTIONS]}
+                value={selectedSortOption}
+                onChange={(option) =>
+                  setSelectedSortOrder(toPriceSortOrder(option?.value))
+                }
+                isClearable
                 placeholder="Select sort by"
+                className="w-48"
               />
             </div>
           </div>

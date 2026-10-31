@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { UkPostcodeInput } from "@/components/form/UkPostcodeInput";
+import { getUkPostcodeFormatError } from "@/lib/validation/ukPostcode";
 import Link from "next/link";
 import {
   Table,
@@ -120,6 +122,7 @@ const InvoiceTable = () => {
   const [selectedWeekFilter, setSelectedWeekFilter] = useState("");
   const [mpanMprnFilter, setMpanMprnFilter] = useState("");
   const [postcodeFilter, setPostcodeFilter] = useState("");
+  const [showPostcodeFormatError, setShowPostcodeFormatError] = useState(false);
   const [commissionSections, setCommissionSections] = useState<CommissionSectionState[]>([
     createCommissionSectionState(),
   ]);
@@ -354,6 +357,10 @@ const InvoiceTable = () => {
   }, [isInvoiceAdmin, companyFilterSearchTerm, fetchCompanyFilterOptions]);
 
   const handleApplyInvoiceFilters = () => {
+    const postcodeFormatError = getUkPostcodeFormatError(postcodeFilter);
+    setShowPostcodeFormatError(true);
+    if (postcodeFormatError) return;
+
     const trimmedMpanMprn = mpanMprnFilter.trim();
     const trimmedPostcode = postcodeFilter.trim();
 
@@ -369,6 +376,7 @@ const InvoiceTable = () => {
   };
 
   const handleClearInvoiceFilters = () => {
+    setShowPostcodeFormatError(false);
     setSelectedCompanyFilterOption(ALL_COMPANIES_OPTION);
     setSelectedMonthFilter("");
     setSelectedWeekFilter("");
@@ -1371,12 +1379,11 @@ const InvoiceTable = () => {
               >
                 Post Code
               </label>
-              <input
+              <UkPostcodeInput
                 id="invoice-list-postcode-filter"
-                type="text"
                 value={postcodeFilter}
-                onChange={(event) => setPostcodeFilter(event.target.value)}
-                placeholder="Enter post code"
+                onChange={setPostcodeFilter}
+                showError={showPostcodeFormatError}
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>

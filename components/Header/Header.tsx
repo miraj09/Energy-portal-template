@@ -16,6 +16,10 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { useLogoutForm } from "@/components/LogoutForm";
 import { LogoutConfirmationModal } from "@/components/LogoutConfirmationModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/modal";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_PLACEHOLDER,
+} from "@/lib/validation/ukPhone";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { patchMethod } from "@/lib/actions/patchMethod";
@@ -43,6 +47,7 @@ export const Header = (): JSX.Element => {
   }>({ name: "", email: "", phone: "", imageUrl: null, imagePreview: null });
   const [saveSuccess, setSaveSuccess] = useState<string>("");
   const [saveError, setSaveError] = useState<string>("");
+  const [phoneError, setPhoneError] = useState<string>("");
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -94,6 +99,13 @@ export const Header = (): JSX.Element => {
       toast.error("Name and Email are required");
       return;
     }
+    const phoneFormatError = getUkPhoneFormatError(form.phone);
+    if (phoneFormatError) {
+      setPhoneError(phoneFormatError);
+      toast.error(phoneFormatError);
+      return;
+    }
+    setPhoneError("");
     if (!user?.slug) {
       console.log("No user slug found");
       return;
@@ -339,6 +351,8 @@ export const Header = (): JSX.Element => {
         onPickImage={onPickImage}
         saveSuccess={saveSuccess}
         saveError={saveError}
+        phoneError={phoneError}
+        setPhoneError={setPhoneError}
         isImageUploading={isImageUploading}
         isSaving={isSaving}
       />
@@ -357,6 +371,8 @@ export const ProfileEditModal = ({
   onPickImage,
   saveSuccess,
   saveError,
+  phoneError,
+  setPhoneError,
   isImageUploading,
   isSaving,
 }: {
@@ -382,6 +398,8 @@ export const ProfileEditModal = ({
   onPickImage: React.ChangeEventHandler<HTMLInputElement>;
   saveSuccess?: string;
   saveError?: string;
+  phoneError: string;
+  setPhoneError: React.Dispatch<React.SetStateAction<string>>;
   isImageUploading?: boolean;
   isSaving?: boolean;
 }) => {
@@ -432,11 +450,27 @@ export const ProfileEditModal = ({
               <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
+                type="tel"
+                inputMode="tel"
+                placeholder={UK_PHONE_PLACEHOLDER}
                 value={form.phone}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, phone: e.target.value }))
+                onChange={(e) => {
+                  const nextPhone = e.target.value;
+                  setForm((p) => ({ ...p, phone: nextPhone }));
+                  setPhoneError((currentError) =>
+                    currentError
+                      ? getUkPhoneFormatError(nextPhone) ?? ""
+                      : currentError
+                  );
+                }}
+                onBlur={(e) =>
+                  setPhoneError(getUkPhoneFormatError(e.target.value) ?? "")
                 }
+                aria-invalid={phoneError ? true : undefined}
               />
+              {phoneError ? (
+                <p className="mt-1 text-xs text-red-600">{phoneError}</p>
+              ) : null}
             </div>
             <div>
               <Label htmlFor="image">Image</Label>

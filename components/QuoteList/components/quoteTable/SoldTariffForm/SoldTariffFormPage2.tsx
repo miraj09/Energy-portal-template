@@ -9,6 +9,11 @@ import type { SoldTariffFormData, ValidationErrors } from "./SoldTariffForm";
 import StepIndicator from "./StepIndicator";
 import { useGetRequest } from "@/composable";
 import { getLocationByPostcode } from "@/lib/actions/getLocationByPostcode";
+import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
+import { UK_PHONE_PLACEHOLDER } from "@/lib/validation/ukPhone";
 
 // Types for location API response
 interface LocationAddress {
@@ -73,6 +78,9 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
   const [locationOptions, setLocationOptions] = useState<SelectOption[]>([]);
   // State to track whether location dropdown should be shown
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [postcodeLookupError, setPostcodeLookupError] = useState<string | null>(
+    null
+  );
   // Keep raw items to parse structured address on selection
   const [locationItems, setLocationItems] = useState<LocationItem[]>([]);
   // Local loading state to cover both direct API and fallback fetch
@@ -234,6 +242,13 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
 
   // Function to handle postcode search with fallback
   const handlePostcodeSearch = useCallback(async () => {
+    const postcodeFormatError = getUkPostcodeFormatError(form.homePostCode || "");
+    if (postcodeFormatError) {
+      setPostcodeLookupError(postcodeFormatError);
+      return;
+    }
+    setPostcodeLookupError(null);
+
     if (form.homePostCode?.trim()) {
       console.log("Searching for postcode:", form.homePostCode.trim());
       setShowLocationDropdown(true);
@@ -461,7 +476,7 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                         handleInput("telephoneNumber", sanitized);
                       }}
                       className={`w-full h-[35px] bg-white rounded border-[0.8px] border-solid shadow-shadow-xs px-4 py-1.5 text-sm font-normal tracking-[0] leading-6 font-['Arial',Helvetica,sans-serif] ${validationErrors.telephoneNumber ? 'border-red-500' : 'border-neutral-500'}`}
-                      placeholder="+44 20 1234 5678"
+                      placeholder={UK_PHONE_PLACEHOLDER}
                       type="tel"
                       inputMode="tel"
                       pattern="^[0-9+()\- ]*$"
@@ -504,10 +519,13 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                     </Label>
                     <div className="flex">
                       <Input
-                        className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${validationErrors.homePostCode ? 'border-red-500' : 'border-neutral-500'}`}
-                        placeholder="E6 3BJ"
+                        className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${validationErrors.homePostCode || postcodeLookupError ? 'border-red-500' : 'border-neutral-500'}`}
+                        placeholder={UK_POSTCODE_PLACEHOLDER}
                         value={form.homePostCode}
-                        onChange={(e) => handleInput("homePostCode", e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          setPostcodeLookupError(null);
+                          handleInput("homePostCode", e.target.value.toUpperCase());
+                        }}
                       />
                       <Button 
                         className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px]"
@@ -517,8 +535,10 @@ const SoldTariffFormPage2: React.FC<SoldTariffFormPage2Props> = ({
                         {isSearching || isLoadingLocations ? "..." : "Find"}
                       </Button>
                     </div>
-                    {validationErrors.homePostCode && (
-                      <p className="text-sm text-red-500 mt-1">{validationErrors.homePostCode[0]}</p>
+                    {(validationErrors.homePostCode || postcodeLookupError) && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {validationErrors.homePostCode?.[0] || postcodeLookupError}
+                      </p>
                     )}
                   </div>
                   {/* 

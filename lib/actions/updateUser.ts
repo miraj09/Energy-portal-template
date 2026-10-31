@@ -4,12 +4,21 @@ import { z } from "zod";
 import { revalidatePath, updateTag } from "next/cache";
 import { patchResource } from "@/lib/actions/baseMutations";
 import { CURRENT_USER_PERMISSIONS_REVALIDATE_TAG } from "@/lib/constants/revalidateTags";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_FORMAT_ERROR,
+} from "@/lib/validation/ukPhone";
 
 const updateUserSchema = z.object({
   slug: z.string().min(1),
   name: z.string().min(1),
   email: z.email(),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .optional()
+    .refine((value) => !value?.trim() || getUkPhoneFormatError(value) == null, {
+      message: UK_PHONE_FORMAT_ERROR,
+    }),
   role: z.array(z.number()).optional(),
   gender: z.union([z.number(), z.string()]).optional(),
   user_id: z.string().optional(),

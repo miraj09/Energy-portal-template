@@ -2,7 +2,6 @@
 import { Card, CardContent } from "@/ui/card";
 import { Dialog, DialogContent } from "@/ui/modal";
 import { Slider } from "@/ui/slider";
-import { X } from "lucide-react";
 import { JSX, useState } from "react";
 
 interface CostBreakdownModalProps {
@@ -95,17 +94,8 @@ export const CostBreakdownModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto bg-white p-0">
+        {/* Close button comes from the shared DialogContent (ui/modal.tsx); no custom header needed */}
         <div className="relative m-4">
-          {/* Header */}
-          <div className="flex items-center justify-end p-4 border-b border-gray-200">
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
           {/* Content */}
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

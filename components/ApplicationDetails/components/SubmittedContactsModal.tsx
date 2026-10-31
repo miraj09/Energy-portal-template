@@ -14,6 +14,8 @@ import {
 import { Site, Meter } from "../types";
 import {
   buildMeterReferenceForDisplay,
+  getGasMprnForDisplay,
+  isGasApplicationMeter,
   resolveMeterDisplayRates,
 } from "@/composable/meterQuoteForm";
 
@@ -81,6 +83,7 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                   </div>
                   <div className="p-4 space-y-6">
                     {meters.map((m) => {
+                      const isGas = isGasApplicationMeter(m);
                       const ref = buildMeterReferenceForDisplay(m);
                       const rates = resolveMeterDisplayRates(m);
                       const showRate = (value: string) =>
@@ -90,6 +93,16 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                           <div className="grid grid-cols-1 md:grid-cols-1 gap-4 p-4">
                             <div className="flex items-start">
                               <div className="mr-4">
+                                {isGas ? (
+                                  <div className="min-w-[140px]">
+                                    <div className="text-[#737373] text-sm">
+                                      MPRN
+                                    </div>
+                                    <div className="text-black text-sm font-medium">
+                                      {getGasMprnForDisplay(m)}
+                                    </div>
+                                  </div>
+                                ) : (
                                 <div className="flex items-center">
                                   <div className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#363636] border-r-0">
                                     <span className="font-medium text-[#363636] text-lg">
@@ -138,6 +151,7 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                     </div>
                                   </div>
                                 </div>
+                                )}
                               </div>
                               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-sm w-full">
                                 <div>
@@ -232,17 +246,21 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                         Term
                                       </TableHead>
                                       <TableHead className="text-white font-medium py-2 px-3">
-                                        Day Rate
+                                        {isGas ? "Unit Rate" : "Day Rate"}
                                       </TableHead>
-                                      <TableHead className="text-white font-medium py-2 px-3">
-                                        Night Rate
-                                      </TableHead>
-                                      <TableHead className="text-white font-medium py-2 px-3">
-                                        EW Rate
-                                      </TableHead>
-                                      <TableHead className="text-white font-medium py-2 px-3">
-                                        Winter Rate
-                                      </TableHead>
+                                      {isGas ? null : (
+                                        <>
+                                          <TableHead className="text-white font-medium py-2 px-3">
+                                            Night Rate
+                                          </TableHead>
+                                          <TableHead className="text-white font-medium py-2 px-3">
+                                            EW Rate
+                                          </TableHead>
+                                          <TableHead className="text-white font-medium py-2 px-3">
+                                            Winter Rate
+                                          </TableHead>
+                                        </>
+                                      )}
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
@@ -256,15 +274,19 @@ const SubmittedContactsModal: React.FC<SubmittedContactsModalProps> = ({
                                       <TableCell className="py-2 px-3">
                                         {showRate(rates.dayRate)}
                                       </TableCell>
-                                      <TableCell className="py-2 px-3">
-                                        {showRate(rates.nightRate)}
-                                      </TableCell>
-                                      <TableCell className="py-2 px-3">
-                                        {showRate(rates.eveningWeekendRate)}
-                                      </TableCell>
-                                      <TableCell className="py-2 px-3">
-                                        {showRate(rates.winterRate)}
-                                      </TableCell>
+                                      {isGas ? null : (
+                                        <>
+                                          <TableCell className="py-2 px-3">
+                                            {showRate(rates.nightRate)}
+                                          </TableCell>
+                                          <TableCell className="py-2 px-3">
+                                            {showRate(rates.eveningWeekendRate)}
+                                          </TableCell>
+                                          <TableCell className="py-2 px-3">
+                                            {showRate(rates.winterRate)}
+                                          </TableCell>
+                                        </>
+                                      )}
                                     </TableRow>
                                   </TableBody>
                                 </Table>

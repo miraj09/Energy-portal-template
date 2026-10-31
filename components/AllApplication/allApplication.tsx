@@ -20,6 +20,8 @@ import { format } from "date-fns";
 import { Application } from "./type";
 import { usePaginatedTableQuery } from "@/hooks/usePaginatedTableQuery";
 import { useAgentUserIdParam } from "@/hooks/useAgentUserIdParam";
+import { UkPostcodeInput } from "@/components/form/UkPostcodeInput";
+import { getUkPostcodeFormatError } from "@/lib/validation/ukPostcode";
 
 /**
  * Query-param names the company list API expects for the "Created Date" range.
@@ -53,6 +55,7 @@ const AllApplicationTable = () => {
     postcode: "",
     businessName: "",
   });
+  const [showPostcodeFormatError, setShowPostcodeFormatError] = useState(false);
   // Draft date range picked in the panel; like the text inputs it is only sent
   // to the API once "Apply Filters" is clicked.
   const [selectedDateRange, setSelectedDateRange] =
@@ -169,6 +172,12 @@ const AllApplicationTable = () => {
   };
 
   const handleApplyAdvancedFilters = () => {
+    const postcodeFormatError = getUkPostcodeFormatError(
+      advancedFilterInputs.postcode
+    );
+    setShowPostcodeFormatError(true);
+    if (postcodeFormatError) return;
+
     setFilters((prevFilters) => {
       const nextFilters: TableFilters = { ...prevFilters };
 
@@ -195,6 +204,7 @@ const AllApplicationTable = () => {
   };
 
   const handleClearAdvancedFilters = () => {
+    setShowPostcodeFormatError(false);
     setAdvancedFilterInputs({
       mpanMprn: "",
       postcode: "",
@@ -253,7 +263,7 @@ const AllApplicationTable = () => {
           updateInstanceState("all-application-table", { filterMenuOpen: open })
         }
       />
-      <Card className="">
+      <Card className="overflow-hidden">
         <div className="px-6 pt-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col">
@@ -277,13 +287,12 @@ const AllApplicationTable = () => {
               <label className="text-sm font-medium text-gray-700 mb-1">
                 Post Code
               </label>
-              <input
-                type="text"
+              <UkPostcodeInput
                 value={advancedFilterInputs.postcode}
-                onChange={(e) =>
-                  handleAdvancedFilterInputChange("postcode", e.target.value)
+                onChange={(value) =>
+                  handleAdvancedFilterInputChange("postcode", value)
                 }
-                placeholder="Enter post code"
+                showError={showPostcodeFormatError}
                 className="border border-[#A0A0A0] rounded px-3 py-2 text-sm bg-white text-[#222] focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>

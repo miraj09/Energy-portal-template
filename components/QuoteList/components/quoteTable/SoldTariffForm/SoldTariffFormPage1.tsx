@@ -12,6 +12,10 @@ import { useGetRequest } from "@/composable";
 import { getLocationByPostcode } from "@/lib/actions/getLocationByPostcode";
 import { resolveBusinessTypePk } from "@/composable/resolveBusinessTypePk";
 import { getDropdown } from "@/lib/actions/getDropdown";
+import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
 
 // Title options for contact (shared with Page 2)
 const titleOptions: SelectOption[] = [
@@ -61,6 +65,9 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
 }) => {
   // State to track whether location dropdown should be shown
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [postcodeLookupError, setPostcodeLookupError] = useState<string | null>(
+    null
+  );
   
   // State for location options from API
   const [locationOptions, setLocationOptions] = useState<SelectOption[]>([]);
@@ -706,6 +713,13 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
 
   // Handle find button click
   const handleFindClick = async () => {
+    const postcodeFormatError = getUkPostcodeFormatError(form.postCode);
+    if (postcodeFormatError) {
+      setPostcodeLookupError(postcodeFormatError);
+      return;
+    }
+    setPostcodeLookupError(null);
+
     if (form.postCode.trim()) {
       setLocationLoading(true);
       setShowLocationDropdown(false);
@@ -882,11 +896,14 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                   <div className="flex">
                     <Input
                       className={`flex-1 h-[35px] rounded-l rounded-r-none border-[0.8px] border-solid shadow-shadow-xs ${
-                        validationErrors.postCode ? 'border-red-500' : 'border-neutral-500'
+                        validationErrors.postCode || postcodeLookupError ? 'border-red-500' : 'border-neutral-500'
                       }`}
-                      placeholder="E6 3BJ"
+                      placeholder={UK_POSTCODE_PLACEHOLDER}
                       value={form.postCode}
-                      onChange={(e) => handleInput("postCode", e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setPostcodeLookupError(null);
+                        handleInput("postCode", e.target.value.toUpperCase());
+                      }}
                     />
                     <Button 
                       className="w-[83px] h-[35px] bg-[#346fb6] rounded-r rounded-l-none text-white text-lg font-medium ml-[-1px]"
@@ -896,8 +913,10 @@ const SoldTariffFormPage1: React.FC<SoldTariffFormPage1Props> = ({
                       {locationLoading ? "..." : "Find"}
                     </Button>
                   </div>
-                  {validationErrors.postCode && (
-                    <p className="text-sm text-red-500 mt-1">{validationErrors.postCode[0]}</p>
+                  {(validationErrors.postCode || postcodeLookupError) && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {validationErrors.postCode?.[0] || postcodeLookupError}
+                    </p>
                   )}
                 </div>
 

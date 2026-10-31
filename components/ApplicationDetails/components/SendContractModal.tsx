@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import type { Meter, Site } from "@/components/ApplicationDetails/types";
 import {
   buildMeterReferenceForDisplay,
+  getGasMprnForDisplay,
+  isGasApplicationMeter,
   resolveMeterDisplayRates,
 } from "@/composable/meterQuoteForm";
 import {
@@ -135,6 +137,17 @@ function flattenActiveMeters(sites: Site[]): MeterCardItem[] {
 }
 
 function MeterReferenceBadge({ meter }: { meter: Meter }) {
+  if (isGasApplicationMeter(meter)) {
+    return (
+      <div className="shrink-0 min-w-[140px]">
+        <div className="text-[#737373] text-sm">MPRN</div>
+        <div className="text-black text-sm font-medium">
+          {getGasMprnForDisplay(meter)}
+        </div>
+      </div>
+    );
+  }
+
   const ref = buildMeterReferenceForDisplay(meter);
   return (
     <div className="flex items-center shrink-0">
@@ -288,6 +301,7 @@ export default function SendContractModal({
                 rates.winterRate,
                 DUMMY.winterRate
               );
+              const isGas = isGasApplicationMeter(meter);
 
               return (
                 <div
@@ -348,17 +362,21 @@ export default function SendContractModal({
                             Term
                           </TableHead>
                           <TableHead className="text-white font-medium py-2 px-3">
-                            Day Rate
+                            {isGas ? "Unit Rate" : "Day Rate"}
                           </TableHead>
-                          <TableHead className="text-white font-medium py-2 px-3">
-                            Night Rate
-                          </TableHead>
-                          <TableHead className="text-white font-medium py-2 px-3">
-                            EW Rate
-                          </TableHead>
-                          <TableHead className="text-white font-medium py-2 px-3">
-                            Winter Rate
-                          </TableHead>
+                          {isGas ? null : (
+                            <>
+                              <TableHead className="text-white font-medium py-2 px-3">
+                                Night Rate
+                              </TableHead>
+                              <TableHead className="text-white font-medium py-2 px-3">
+                                EW Rate
+                              </TableHead>
+                              <TableHead className="text-white font-medium py-2 px-3">
+                                Winter Rate
+                              </TableHead>
+                            </>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -369,9 +387,13 @@ export default function SendContractModal({
                           </TableCell>
                           <TableCell className="py-2 px-3">{term}</TableCell>
                           <TableCell className="py-2 px-3">{dayRate}</TableCell>
-                          <TableCell className="py-2 px-3">{nightRate}</TableCell>
-                          <TableCell className="py-2 px-3">{ewRate}</TableCell>
-                          <TableCell className="py-2 px-3">{winterRate}</TableCell>
+                          {isGas ? null : (
+                            <>
+                              <TableCell className="py-2 px-3">{nightRate}</TableCell>
+                              <TableCell className="py-2 px-3">{ewRate}</TableCell>
+                              <TableCell className="py-2 px-3">{winterRate}</TableCell>
+                            </>
+                          )}
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -383,6 +405,9 @@ export default function SendContractModal({
                       className="text-sm font-medium text-[#363636]"
                     >
                       Submit Record:
+                      <span className="text-red-500" aria-hidden="true">
+                        *
+                      </span>
                     </Label>
                     <Switch
                       id={switchId}

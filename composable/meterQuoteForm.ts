@@ -631,7 +631,10 @@ function bottomlineToBottomRow(region: string, bottomline: string): string[] {
   ];
 }
 
-function isGasMeter(data: ApplicationMeterApiResponse): boolean {
+/** True when the meter is gas (MPRN), not an electricity MPAN. */
+export function isGasApplicationMeter(
+  data: ApplicationMeterApiResponse
+): boolean {
   const typeLabel = (
     data.meter_type_name ??
     data.meter_type ??
@@ -650,6 +653,14 @@ function isGasMeter(data: ApplicationMeterApiResponse): boolean {
   return false;
 }
 
+/** Gas meters are identified by MPRN (bottomline), not the electricity MPAN grid. */
+export function getGasMprnForDisplay(meter: Meter): string {
+  const quoteFields = extractQuoteFields(meter as ApplicationMeterApiResponse);
+  const mprn =
+    quoteFields.bottomline?.trim() || meter.meter_reference?.trim() || "";
+  return mprn || "N/A";
+}
+
 /** Map GET /api/v1/auth/web/core/meter/{id}/ response to quote form values. */
 export function mapMeterApiToQuoteFormValues(
   data: ApplicationMeterApiResponse
@@ -665,7 +676,7 @@ export function mapMeterApiToQuoteFormValues(
     ...rates,
   };
 
-  if (isGasMeter(data)) {
+  if (isGasApplicationMeter(data)) {
     return {
       ...baseValues,
       mprn:

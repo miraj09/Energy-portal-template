@@ -12,6 +12,7 @@ interface InfoField {
   searchable?: boolean;
   required?: boolean;
   error?: string;
+  placeholder?: string;
   disabled?: boolean;
   inputType?: "text" | "number" | "email" | "tel";
 }
@@ -75,6 +76,7 @@ const DynamicInfoCard: React.FC<DynamicInfoCardProps> = ({
     return (
       <Input
         type={field.inputType || "text"}
+        placeholder={isEditing ? field.placeholder : undefined}
         value={field.value}
         onChange={(e) => handleFieldChange(field.key, e.target.value)}
         className={`w-full border-none rounded px-3 py-2 ${

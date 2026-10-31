@@ -15,6 +15,10 @@ import type { ParentAgentOption, UserRecord } from "@/lib/types/user";
 import { isSubAgentUser, userHasAnyRole } from "@/lib/user/mapLoginUserData";
 import { AGENT_ROLE_NAMES } from "@/lib/constants/roles";
 import { cn } from "@/lib/utils";
+import {
+  getUkPhoneFormatError,
+  UK_PHONE_PLACEHOLDER,
+} from "@/lib/validation/ukPhone";
 
 const USER_STORAGE_KEY = "energy_user_Data";
 
@@ -60,6 +64,7 @@ export default function AddUser({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parentAgent, setParentAgent] = useState<number | null>(null);
   const [parentAgentError, setParentAgentError] = useState<string | undefined>();
+  const [phoneError, setPhoneError] = useState<string | undefined>();
   const [currentUser, setCurrentUser] = useState<UserRecord | null>(null);
   const [formState, setFormState] = useState({
     name: "",
@@ -146,6 +151,14 @@ export default function AddUser({
       return;
     }
 
+    const phoneFormatError = getUkPhoneFormatError(formState.phone);
+    if (phoneFormatError) {
+      setPhoneError(phoneFormatError);
+      toast.error(phoneFormatError);
+      return;
+    }
+    setPhoneError(undefined);
+
     setIsSubmitting(true);
     setParentAgentError(undefined);
 
@@ -216,10 +229,28 @@ export default function AddUser({
           <Label htmlFor="phone">Phone</Label>
           <Input
             id="phone"
+            type="tel"
+            inputMode="tel"
+            placeholder={UK_PHONE_PLACEHOLDER}
             className="mt-1"
             value={formState.phone}
-            onChange={(event) => setFormState((prev) => ({ ...prev, phone: event.target.value }))}
+            onChange={(event) => {
+              const nextPhone = event.target.value;
+              setFormState((prev) => ({ ...prev, phone: nextPhone }));
+              setPhoneError((currentError) =>
+                currentError
+                  ? getUkPhoneFormatError(nextPhone) ?? undefined
+                  : currentError
+              );
+            }}
+            onBlur={(event) =>
+              setPhoneError(getUkPhoneFormatError(event.target.value) ?? undefined)
+            }
+            aria-invalid={phoneError ? true : undefined}
           />
+          {phoneError ? (
+            <p className="mt-1 text-xs text-red-600">{phoneError}</p>
+          ) : null}
         </div>
         <div>
           <Label htmlFor="password">Password</Label>

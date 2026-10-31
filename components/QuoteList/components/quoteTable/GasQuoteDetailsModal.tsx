@@ -9,6 +9,10 @@ import { Dialog, DialogContent } from "@/ui/modal";
 import { Switch } from "@/ui/switch";
 import { patchMethod } from "@/lib/actions/patchMethod";
 import { toast } from "sonner";
+import {
+  getUkPostcodeFormatError,
+  UK_POSTCODE_PLACEHOLDER,
+} from "@/lib/validation/ukPostcode";
 import { buildFlatQuotePayload } from "@/composable/meterQuoteForm";
 import { SupplierOption } from "@/hooks/useSuppliers";
 import { useSupplierContext } from "@/contexts/SupplierContext";
@@ -161,6 +165,7 @@ export const GasQuoteDetailsModal = ({
   onSaveSuccess,
 }: GasQuoteDetailsModalProps): JSX.Element => {
   const [isSaving, setIsSaving] = useState(false);
+  const [postcodeError, setPostcodeError] = useState<string | null>(null);
   // Suppliers from context
   const { supplierOptions, loading: suppliersLoading } = useSupplierContext();
 
@@ -233,6 +238,12 @@ export const GasQuoteDetailsModal = ({
   const handleSave = async () => {
     if (!quoteHeaderData?.id) {
       toast.error("No quote ID available for saving");
+      return;
+    }
+
+    const postcodeFormatError = getUkPostcodeFormatError(formData.postcode);
+    if (postcodeFormatError) {
+      setPostcodeError(postcodeFormatError);
       return;
     }
 
@@ -339,10 +350,18 @@ export const GasQuoteDetailsModal = ({
                     </label>
                     <Input
                       value={formData.postcode}
-                      onChange={(e) => handleInputChange("postcode", e.target.value)}
-                      placeholder="Enter postcode"
+                      onChange={(e) => {
+                        handleInputChange("postcode", e.target.value);
+                        if (!getUkPostcodeFormatError(e.target.value)) {
+                          setPostcodeError(null);
+                        }
+                      }}
+                      placeholder={UK_POSTCODE_PLACEHOLDER}
                       className="h-8.75 border-[0.8px] border-solid border-[#363636] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] text-xs sm:text-sm lg:text-base text-[#858D9D]"
                     />
+                    {postcodeError ? (
+                      <p className="text-red-500 text-xs mt-1">{postcodeError}</p>
+                    ) : null}
                   </div>
 
                   {/* Current Supplier */}
