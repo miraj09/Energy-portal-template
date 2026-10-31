@@ -14,6 +14,9 @@ export default function ResetPasswordPage(): JSX.Element {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [error, setError] = React.useState("");
+  // Tracks the in-flight request so the button can be disabled and
+  // the user can't fire duplicate OTP requests by double-clicking.
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const validateEmail = (email: string) => {
     // Simple email regex
@@ -21,23 +24,31 @@ export default function ResetPasswordPage(): JSX.Element {
   };
 
   const handleGetCode = async () => {
+    // Guard against a second submit while a request is already running
+    if (isSubmitting) return;
+
     if (!validateEmail(email)) {
       setError("Please enter a valid email address.");
       return;
     }
     setError("");
+    setIsSubmitting(true);
     try {
       const res = await getCodeAction(email);
       if (res.success) {
         localStorage.setItem("emailForReset", email);
+        // Fire the toast before navigating so it isn't lost during the route change
+        toast.success("OTP sent successfully! Please check your email.");
         router.push("/verify-email");
-        toast.success('OTP sent successfully! Please check your email.');
       } else {
         setError(res.message || "Failed to send code. Please try again.");
       }
     } catch (err) {
       console.error("Error sending code:", err);
       setError("Something went wrong. Please try again.");
+    } finally {
+      // Always re-enable the button, whether the request succeeded or failed
+      setIsSubmitting(false);
     }
   };
 
@@ -72,7 +83,7 @@ export default function ResetPasswordPage(): JSX.Element {
                 </h1>
                 <p className="text-center font-inter text-sm sm:text-base font-normal text-gray-500 leading-5 sm:leading-6 tracking-normal px-2">
                   Forgot your password? Please enter your email and we&apos;ll
-                  send you a 4-digit code.
+                  send you a 6-digit code.
                 </p>
               </div>
 
@@ -90,19 +101,39 @@ export default function ResetPasswordPage(): JSX.Element {
                       id="email"
                       placeholder="Enter your email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        // Clear any previous error (validation or API) once the user edits the email
+                        if (error) setError("");
+                      }}
+                      aria-invalid={Boolean(error)}
+                      aria-describedby={error ? "email-error" : undefined}
                       className="px-3 sm:px-3.5 py-2.5 border-[#cfd4dc] shadow-[0px_1px_2px_0px_rgba(16,24,40,0.05)] font-inter text-sm sm:text-base font-normal text-[#667085]"
                     />
-                    {!validateEmail(email) && email.length > 0 && (
-                      <p className="text-red-500 text-xs mt-1">{error}</p>
+                    {/*
+                      Show the error whenever one is set. This covers both client-side
+                      validation ("Please enter a valid email address.") and API errors
+                      such as "account not found", which previously were hidden because
+                      the old condition only rendered when the email format was invalid.
+                    */}
+                    {error && (
+                      <p
+                        id="email-error"
+                        role="alert"
+                        className="text-red-500 text-xs mt-1"
+                      >
+                        {error}
+                      </p>
                     )}
                   </div>
                   {/* Get Code Button */}
                   <Button
                     onClick={handleGetCode}
+                    disabled={isSubmitting}
+                    aria-busy={isSubmitting}
                     className="w-full bg-[#346fb6] hover:bg-[#2a5c9a] text-white font-body-1-medium text-sm sm:text-base tracking-[0.01em] leading-6"
                   >
-                    Get 4-digit code
+                    {isSubmitting ? "Sending code..." : "Get 6-digit code"}
                   </Button>
                 </div>
               </div>

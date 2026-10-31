@@ -18,7 +18,7 @@ export async function resetPasswordAction(
 }> {
   try {
     const res = await fetch(
-      `${process.env.BASE_URL}/api/v1/auth/web/forget-password-confirm/`,
+      `${process.env.BASE_URL}/api/v1/auth/web/reset-password/`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

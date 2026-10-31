@@ -21,6 +21,7 @@ export default function OtpVerificationForm(): JSX.Element {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({
+    otp: "",
     password: "",
     confirmPassword: "",
   });
@@ -37,6 +38,9 @@ export default function OtpVerificationForm(): JSX.Element {
     const newOtp = [...otp];
     newOtp[idx] = value;
     setOtp(newOtp);
+    if (errors.otp) {
+      setErrors((prev) => ({ ...prev, otp: "" }));
+    }
 
     // Move focus to next input if value entered
     if (value && idx < otp.length - 1) {
@@ -112,14 +116,18 @@ export default function OtpVerificationForm(): JSX.Element {
     const passwordError = validatePassword(password);
     const confirmPasswordError = validateConfirmPassword(confirmPassword);
 
+    const otpValue = otp.join("");
+    const otpError =
+      otpValue.length === 6 ? "" : "Enter the full 6-digit code.";
+
     setErrors({
+      otp: otpError,
       password: passwordError,
       confirmPassword: confirmPasswordError,
     });
 
     // If there are no errors, proceed with password reset
-    if (!passwordError && !confirmPasswordError) {
-      const otpValue = otp.join(""); // Will now be 6 digits
+    if (!otpError && !passwordError && !confirmPasswordError) {
       const passwordValue = password;
       // Get email from localStorage
       const emailForReset =
@@ -244,6 +252,11 @@ export default function OtpVerificationForm(): JSX.Element {
                 />
               ))}
             </div>
+            {errors.otp && (
+              <p className="text-red-500 text-xs font-inter text-center mt-2">
+                {errors.otp}
+              </p>
+            )}
 
             <div className="flex flex-col w-full gap-4 mt-6 sm:gap-5">
               <div className="w-full space-y-3 sm:space-y-4">
