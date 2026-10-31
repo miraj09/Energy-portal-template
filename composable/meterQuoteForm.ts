@@ -631,10 +631,21 @@ function bottomlineToBottomRow(region: string, bottomline: string): string[] {
   ];
 }
 
+/**
+ * Fields used to tell a gas meter from an electricity meter.
+ * Kept loose so both company-list `SiteMeter` quotes and GET /meter/ responses assign.
+ */
+type GasMeterIdentity = {
+  meter_type_name?: string | null;
+  meter_type?: string | null;
+  meter_type_id?: number | null;
+  mpan_mrpn_details?: { is_mpan?: boolean; is_mrpn?: boolean } | null;
+  quote?: { is_mpan?: boolean; is_mrpn?: boolean } | null;
+  quote_header?: { is_mpan?: boolean; is_mrpn?: boolean } | null;
+};
+
 /** True when the meter is gas (MPRN), not an electricity MPAN. */
-export function isGasApplicationMeter(
-  data: ApplicationMeterApiResponse
-): boolean {
+export function isGasApplicationMeter(data: GasMeterIdentity): boolean {
   const typeLabel = (
     data.meter_type_name ??
     data.meter_type ??
@@ -646,7 +657,9 @@ export function isGasApplicationMeter(
   if (data.meter_type_id === 2) return true;
   if (data.meter_type_id === 1) return false;
 
-  if (data.mpan_mrpn_details?.is_mrpn && !data.mpan_mrpn_details?.is_mpan) {
+  const referenceFlags =
+    data.mpan_mrpn_details ?? data.quote ?? data.quote_header;
+  if (referenceFlags?.is_mrpn && !referenceFlags?.is_mpan) {
     return true;
   }
 
